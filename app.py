@@ -377,10 +377,39 @@ def delete_video(video_id):
 
 
 if __name__ == '__main__':
-    # Initialize database if needed
+    # Initialize database if needed or if schema is outdated
+    import sqlite3
+    needs_init = False
+
     if not os.path.exists(Config.DATABASE_PATH):
-        print("Initializing database...")
+        print("Database not found. Initializing...")
+        needs_init = True
+    else:
+        # Check if users table exists (new schema requirement)
+        try:
+            conn = sqlite3.connect(Config.DATABASE_PATH)
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+            if not cursor.fetchone():
+                print("Old database schema detected. Reinitializing...")
+                needs_init = True
+            conn.close()
+        except Exception as e:
+            print(f"Error checking database: {e}")
+            needs_init = True
+
+    if needs_init:
+        # Backup old database if it exists
+        if os.path.exists(Config.DATABASE_PATH):
+            from datetime import datetime
+            backup_path = f"{Config.DATABASE_PATH}.backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            import shutil
+            shutil.copy(Config.DATABASE_PATH, backup_path)
+            print(f"✓ Backed up old database to: {backup_path}")
+            os.remove(Config.DATABASE_PATH)
+
         db.init_database()
+        print("✓ Database initialized with new schema")
 
     print(f"\n{'='*60}")
     print("Voice2Note Application Starting")
