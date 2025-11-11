@@ -47,9 +47,20 @@ body {
     align-items: center;
 }
 
+.brand-link {
+    text-decoration: none;
+    color: inherit;
+    transition: opacity 0.3s;
+}
+
+.brand-link:hover {
+    opacity: 0.8;
+}
+
 .nav-brand h1 {
     font-size: 1.5rem;
     color: var(--primary-color);
+    cursor: pointer;
 }
 
 .nav-links {
