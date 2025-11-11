@@ -24,9 +24,13 @@ class Config:
 
     # Flask configuration
     SECRET_KEY = os.getenv('SECRET_KEY', 'dev-key-change-in-production')
-    DEBUG = True
-    MAX_CONTENT_LENGTH = 500 * 1024 * 1024  # 500MB max file size
+    DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
+    MAX_CONTENT_LENGTH = int(os.getenv('MAX_UPLOAD_SIZE', 500)) * 1024 * 1024  # Default 500MB
     UPLOAD_FOLDER = TEMP_DIR
+
+    # Network configuration
+    HOST = os.getenv('HOST', '0.0.0.0')  # Listen on all interfaces (Tailscale compatible)
+    PORT = int(os.getenv('PORT', 5000))
 
     # Allowed file extensions
     ALLOWED_EXTENSIONS = {'mp4', 'avi', 'mov', 'mkv', 'webm', 'flv', 'wmv', 'mp3', 'wav', 'm4a'}
