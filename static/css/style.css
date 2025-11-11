@@ -1,4 +1,4 @@
-/* Voice2Note Styles */
+/* Voice2Note - Minimalistic Styles */
 
 * {
     margin: 0;
@@ -8,17 +8,17 @@
 
 :root {
     --primary-color: #4f46e5;
-    --primary-dark: #4338ca;
-    --secondary-color: #64748b;
+    --primary-dark: #3730a3;
+    --secondary-color: #6b7280;
     --success-color: #10b981;
     --error-color: #ef4444;
-    --bg-color: #f8fafc;
-    --card-bg: #ffffff;
-    --text-color: #1e293b;
-    --text-muted: #64748b;
-    --border-color: #e2e8f0;
-    --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    --bg-color: #ffffff;
+    --card-bg: #fafafa;
+    --text-color: #111827;
+    --text-muted: #6b7280;
+    --border-color: #e5e7eb;
+    --shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-lg: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
 body {
@@ -36,10 +36,9 @@ body {
 
 /* Navbar */
 .navbar {
-    background: var(--card-bg);
+    background: var(--bg-color);
     border-bottom: 1px solid var(--border-color);
-    padding: 1rem 0;
-    box-shadow: var(--shadow);
+    padding: 1.25rem 0;
 }
 
 .navbar .container {
@@ -48,9 +47,20 @@ body {
     align-items: center;
 }
 
+.brand-link {
+    text-decoration: none;
+    color: inherit;
+    transition: opacity 0.3s;
+}
+
+.brand-link:hover {
+    opacity: 0.8;
+}
+
 .nav-brand h1 {
     font-size: 1.5rem;
     color: var(--primary-color);
+    cursor: pointer;
 }
 
 .nav-links {
@@ -95,9 +105,9 @@ body {
 /* Upload Section */
 .upload-section {
     background: var(--card-bg);
-    border-radius: 12px;
+    border-radius: 8px;
     padding: 2.5rem;
-    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border-color);
     max-width: 700px;
     margin: 0 auto 3rem;
 }
@@ -217,8 +227,6 @@ body {
 
 .btn-primary:hover:not(:disabled) {
     background: var(--primary-dark);
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
 }
 
 .btn-secondary {
@@ -253,7 +261,7 @@ body {
 
 .progress-bar {
     width: 100%;
-    height: 12px;
+    height: 8px;
     background: var(--border-color);
     border-radius: 6px;
     overflow: hidden;
@@ -262,14 +270,54 @@ body {
 
 .progress-fill {
     height: 100%;
-    background: var(--primary-color);
-    transition: width 0.3s ease;
+    background: linear-gradient(90deg, var(--primary-color), #6366f1);
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     width: 0%;
+    box-shadow: 0 0 10px rgba(79, 70, 229, 0.3);
 }
 
 .status-text {
     color: var(--text-muted);
     font-size: 0.875rem;
+}
+
+/* Video progress (for history cards) */
+.video-progress {
+    margin-top: 0.75rem !important;
+}
+
+.video-progress .progress-bar {
+    width: 100%;
+    height: 8px;
+    background: var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 0.5rem 0;
+}
+
+.video-progress .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-color), #6366f1);
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 10px rgba(79, 70, 229, 0.3);
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.video-progress .progress-text {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+    font-weight: 500;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.8;
+    }
 }
 
 /* Result Section */
@@ -329,14 +377,9 @@ body {
 .feature-card {
     background: var(--card-bg);
     padding: 2rem;
-    border-radius: 12px;
+    border-radius: 8px;
     text-align: center;
-    box-shadow: var(--shadow);
-    transition: transform 0.3s;
-}
-
-.feature-card:hover {
-    transform: translateY(-5px);
+    border: 1px solid var(--border-color);
 }
 
 .feature-icon {
@@ -396,8 +439,8 @@ body {
 .notes-content {
     background: var(--card-bg);
     padding: 3rem;
-    border-radius: 12px;
-    box-shadow: var(--shadow);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
 }
 
 #markdown-content {
@@ -492,16 +535,11 @@ body {
 .video-card {
     background: var(--card-bg);
     padding: 1.5rem;
-    border-radius: 12px;
-    box-shadow: var(--shadow);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    transition: transform 0.3s;
-}
-
-.video-card:hover {
-    transform: translateX(5px);
 }
 
 .video-info h3 {
@@ -553,6 +591,16 @@ body {
 .status-pending {
     background: #fef3c7 !important;
     color: #d97706 !important;
+}
+
+.status-cancelled {
+    background: #fee2e2 !important;
+    color: #f59e0b !important;
+}
+
+.status-extracting, .status-transcribing, .status-generating {
+    background: #dbeafe !important;
+    color: #3b82f6 !important;
 }
 
 /* Footer */

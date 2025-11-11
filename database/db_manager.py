@@ -2,6 +2,7 @@ import sqlite3
 import json
 from datetime import datetime
 from config import Config
+import hashlib
 
 
 class DatabaseManager:
@@ -30,15 +31,15 @@ class DatabaseManager:
         conn.close()
         print(f"Database initialized at: {self.db_path}")
 
-    def create_video(self, source_url, source_type, title, creator=None, duration=None):
+    def create_video(self, user_id, source_url, source_type, title, creator=None, duration=None):
         """Create a new video record"""
         conn = self.get_connection()
         cursor = conn.cursor()
 
         cursor.execute('''
-            INSERT INTO videos (source_url, source_type, title, creator, duration)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (source_url, source_type, title, creator, duration))
+            INSERT INTO videos (user_id, source_url, source_type, title, creator, duration)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (user_id, source_url, source_type, title, creator, duration))
 
         video_id = cursor.lastrowid
         conn.commit()
@@ -196,3 +197,157 @@ class DatabaseManager:
 
         conn.commit()
         conn.close()
+
+    # ===== User Management Methods =====
+
+    def create_user(self, username, email, password):
+        """Create a new user"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        # Hash password
+        password_hash = hashlib.sha256(password.encode()).hexdigest()
+
+        try:
+            cursor.execute('''
+                INSERT INTO users (username, email, password_hash)
+                VALUES (?, ?, ?)
+            ''', (username, email, password_hash))
+
+            user_id = cursor.lastrowid
+            conn.commit()
+            conn.close()
+            return user_id
+        except sqlite3.IntegrityError:
+            conn.close()
+            return None
+
+    def get_user_by_username(self, username):
+        """Get user by username"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute('SELECT * FROM users WHERE username = ?', (username,))
+        user = cursor.fetchone()
+
+        conn.close()
+        return dict(user) if user else None
+
+    def get_user_by_email(self, email):
+        """Get user by email"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
+        user = cursor.fetchone()
+
+        conn.close()
+        return dict(user) if user else None
+
+    def get_user_by_id(self, user_id):
+        """Get user by ID"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute('SELECT * FROM users WHERE id = ?', (user_id,))
+        user = cursor.fetchone()
+
+        conn.close()
+        return dict(user) if user else None
+
+    def verify_password(self, username, password):
+        """Verify user password"""
+        user = self.get_user_by_username(username)
+        if not user:
+            # Also try email
+            user = self.get_user_by_email(username)
+
+        if not user:
+            return None
+
+        password_hash = hashlib.sha256(password.encode()).hexdigest()
+        if user['password_hash'] == password_hash:
+            return user
+        return None
+
+    def update_last_login(self, user_id):
+        """Update user's last login timestamp"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            UPDATE users
+            SET last_login = ?
+            WHERE id = ?
+        ''', (datetime.now(), user_id))
+
+        conn.commit()
+        conn.close()
+
+    def get_user_statistics(self, user_id):
+        """Get statistics for a specific user"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        # Count videos
+        cursor.execute('SELECT COUNT(*) FROM videos WHERE user_id = ?', (user_id,))
+        total_videos = cursor.fetchone()[0]
+
+        # Count notes
+        cursor.execute('''
+            SELECT COUNT(*) FROM notes n
+            JOIN videos v ON n.video_id = v.id
+            WHERE v.user_id = ?
+        ''', (user_id,))
+        total_notes = cursor.fetchone()[0]
+
+        # Count transcripts
+        cursor.execute('''
+            SELECT COUNT(*) FROM transcripts t
+            JOIN videos v ON t.video_id = v.id
+            WHERE v.user_id = ?
+        ''', (user_id,))
+        total_transcripts = cursor.fetchone()[0]
+
+        # Calculate storage (approximate by counting characters)
+        cursor.execute('''
+            SELECT
+                COALESCE(SUM(LENGTH(n.content)), 0) as notes_size,
+                COALESCE(SUM(LENGTH(t.transcript_text)), 0) as transcript_size
+            FROM videos v
+            LEFT JOIN notes n ON v.id = n.video_id
+            LEFT JOIN transcripts t ON v.id = t.video_id
+            WHERE v.user_id = ?
+        ''', (user_id,))
+        sizes = cursor.fetchone()
+        total_bytes = (sizes[0] or 0) + (sizes[1] or 0)
+        storage_mb = round(total_bytes / (1024 * 1024), 2)
+
+        conn.close()
+
+        return {
+            'total_videos': total_videos,
+            'total_notes': total_notes,
+            'total_transcripts': total_transcripts,
+            'storage_mb': storage_mb
+        }
+
+    def get_user_videos(self, user_id, limit=50, offset=0):
+        """Get all videos for a specific user"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            SELECT v.*, n.id as notes_id, ps.status as processing_status
+            FROM videos v
+            LEFT JOIN notes n ON v.id = n.video_id
+            LEFT JOIN processing_status ps ON v.id = ps.video_id
+            WHERE v.user_id = ?
+            ORDER BY v.processed_date DESC
+            LIMIT ? OFFSET ?
+        ''', (user_id, limit, offset))
+
+        videos = cursor.fetchall()
+        conn.close()
+
+        return [dict(video) for video in videos]
