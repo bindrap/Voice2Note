@@ -442,14 +442,30 @@ def cancel_processing(video_id):
         if not video or video['user_id'] != session['user_id']:
             return jsonify({'success': False, 'error': 'Video not found'}), 404
 
-        # Check if video is being processed
+        # Check database status first
+        status = db.get_processing_status(video_id)
+        if not status:
+            return jsonify({'success': False, 'error': 'No processing status found'}), 404
+
+        # Check if video is in a cancellable state
+        processing_states = ['pending', 'extracting', 'transcribing', 'generating']
+        if status['status'] not in processing_states:
+            return jsonify({'success': False, 'error': f'Cannot cancel video with status: {status["status"]}'}), 400
+
+        # Try to cancel active thread if it exists
         with process_lock:
             if video_id in active_processes:
-                # Set cancel flag
+                # Set cancel flag for active thread
                 active_processes[video_id]['cancel'].set()
+                print(f"✓ Cancelled active thread for video {video_id}")
                 return jsonify({'success': True, 'message': 'Processing cancelled'})
             else:
-                return jsonify({'success': False, 'error': 'Video is not currently being processed'}), 400
+                # Thread reference lost (server restart, crashed thread, etc.)
+                # Directly update database to mark as cancelled
+                db.update_processing_status(video_id, 'cancelled', progress=0,
+                                          error_message='Cancelled by user (thread reference lost)')
+                print(f"✓ Marked video {video_id} as cancelled in database (no active thread found)")
+                return jsonify({'success': True, 'message': 'Processing cancelled (thread was not found, status updated)'})
 
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
