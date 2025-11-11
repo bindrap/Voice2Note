@@ -1,7 +1,8 @@
-from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for
+from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, session, flash
 import os
 import traceback
 from werkzeug.utils import secure_filename
+from functools import wraps
 from config import Config
 from database.db_manager import DatabaseManager
 from processors.video_handler import VideoHandler
@@ -10,6 +11,7 @@ from processors.note_generator import NoteGenerator
 
 app = Flask(__name__)
 app.config.from_object(Config)
+app.secret_key = Config.SECRET_KEY
 
 # Initialize components
 Config.init_app()
@@ -19,26 +21,138 @@ transcriber = Transcriber()
 note_generator = NoteGenerator()
 
 
+def login_required(f):
+    """Decorator to require login for routes"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
 def allowed_file(filename):
     """Check if file extension is allowed"""
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in Config.ALLOWED_EXTENSIONS
 
 
+# Context processor to make current_user available in templates
+@app.context_processor
+def inject_user():
+    if 'user_id' in session:
+        user = db.get_user_by_id(session['user_id'])
+        return {'current_user': user}
+    return {'current_user': None}
+
+
+# ===== Authentication Routes =====
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    """User registration"""
+    if 'user_id' in session:
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
+        confirm_password = request.form.get('confirm_password', '')
+
+        # Validation
+        if not username or len(username) < 3:
+            return render_template('register.html', error='Username must be at least 3 characters')
+
+        if not email or '@' not in email:
+            return render_template('register.html', error='Invalid email address')
+
+        if not password or len(password) < 6:
+            return render_template('register.html', error='Password must be at least 6 characters')
+
+        if password != confirm_password:
+            return render_template('register.html', error='Passwords do not match')
+
+        # Check if username or email already exists
+        if db.get_user_by_username(username):
+            return render_template('register.html', error='Username already taken')
+
+        if db.get_user_by_email(email):
+            return render_template('register.html', error='Email already registered')
+
+        # Create user
+        user_id = db.create_user(username, email, password)
+        if user_id:
+            session['user_id'] = user_id
+            return redirect(url_for('index'))
+        else:
+            return render_template('register.html', error='Registration failed')
+
+    return render_template('register.html')
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """User login"""
+    if 'user_id' in session:
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+
+        if not username or not password:
+            return render_template('login.html', error='Username and password are required')
+
+        user = db.verify_password(username, password)
+        if user:
+            session['user_id'] = user['id']
+            db.update_last_login(user['id'])
+            return redirect(url_for('index'))
+        else:
+            return render_template('login.html', error='Invalid username or password')
+
+    return render_template('login.html')
+
+
+@app.route('/logout')
+def logout():
+    """User logout"""
+    session.clear()
+    return redirect(url_for('login'))
+
+
+@app.route('/profile')
+@login_required
+def profile():
+    """User profile page"""
+    user = db.get_user_by_id(session['user_id'])
+    stats = db.get_user_statistics(session['user_id'])
+    recent_videos = db.get_user_videos(session['user_id'], limit=5)
+
+    return render_template('profile.html', user=user, stats=stats, recent_videos=recent_videos)
+
+
+# ===== Main Application Routes =====
+
 @app.route('/')
+@login_required
 def index():
     """Main page"""
-    return render_template('index.html')
+    stats = db.get_user_statistics(session['user_id'])
+    return render_template('index.html', stats=stats)
 
 
 @app.route('/history')
+@login_required
 def history():
     """View processing history"""
-    videos = db.get_all_videos(limit=50)
+    videos = db.get_user_videos(session['user_id'], limit=50)
     return render_template('history.html', videos=videos)
 
 
 @app.route('/process', methods=['POST'])
+@login_required
 def process():
     """Process video/audio from URL or upload"""
     try:
@@ -68,6 +182,7 @@ def process():
 
         # Create video record
         video_id = db.create_video(
+            user_id=session['user_id'],
             source_url=source if source_type == 'youtube' else None,
             source_type=source_type,
             title='Processing...',
@@ -163,24 +278,28 @@ def process():
 
 
 @app.route('/notes/<int:video_id>')
+@login_required
 def view_notes(video_id):
     """View generated notes"""
     video = db.get_video(video_id)
     notes = db.get_notes(video_id)
 
-    if not video or not notes:
+    # Verify ownership
+    if not video or not notes or video['user_id'] != session['user_id']:
         return "Notes not found", 404
 
     return render_template('notes.html', video=video, notes=notes)
 
 
 @app.route('/download/<int:video_id>')
+@login_required
 def download_notes(video_id):
     """Download notes as markdown file"""
     video = db.get_video(video_id)
     notes = db.get_notes(video_id)
 
-    if not video or not notes:
+    # Verify ownership
+    if not video or not notes or video['user_id'] != session['user_id']:
         return "Notes not found", 404
 
     # Save to temp file
@@ -199,8 +318,14 @@ def download_notes(video_id):
 
 
 @app.route('/status/<int:video_id>')
+@login_required
 def get_status(video_id):
     """Get processing status"""
+    # Verify ownership
+    video = db.get_video(video_id)
+    if not video or video['user_id'] != session['user_id']:
+        return jsonify({'status': 'unknown', 'progress': 0}), 404
+
     status = db.get_processing_status(video_id)
 
     if not status:
@@ -214,24 +339,37 @@ def get_status(video_id):
 
 
 @app.route('/api/videos')
+@login_required
 def api_videos():
     """API endpoint to get all videos"""
-    videos = db.get_all_videos(limit=50)
+    videos = db.get_user_videos(session['user_id'], limit=50)
     return jsonify(videos)
 
 
 @app.route('/api/search')
+@login_required
 def api_search():
     """API endpoint to search videos"""
     query = request.args.get('q', '')
-    videos = db.search_videos(query)
-    return jsonify(videos)
+    user_id = session['user_id']
+
+    # Get user's videos and filter by query
+    videos = db.get_user_videos(user_id, limit=100)
+    filtered = [v for v in videos if query.lower() in v['title'].lower() or
+                (v.get('creator') and query.lower() in v['creator'].lower())]
+    return jsonify(filtered)
 
 
 @app.route('/delete/<int:video_id>', methods=['POST'])
+@login_required
 def delete_video(video_id):
     """Delete a video and its notes"""
     try:
+        # Verify ownership
+        video = db.get_video(video_id)
+        if not video or video['user_id'] != session['user_id']:
+            return jsonify({'success': False, 'error': 'Video not found'}), 404
+
         db.delete_video(video_id)
         return jsonify({'success': True, 'message': 'Video deleted successfully'})
     except Exception as e:

@@ -84,6 +84,29 @@
         </div>
     </div>
 
+    <!-- Stats Section -->
+    <div class="stats-section">
+        <h3>Your Statistics</h3>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value">{{ stats.total_videos }}</div>
+                <div class="stat-label">Videos Processed</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ stats.total_notes }}</div>
+                <div class="stat-label">Notes Generated</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ stats.total_transcripts }}</div>
+                <div class="stat-label">Transcripts</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ stats.storage_mb }} MB</div>
+                <div class="stat-label">Data Stored</div>
+            </div>
+        </div>
+    </div>
+
     <div class="features">
         <h3>How it works</h3>
         <div class="feature-grid">
@@ -109,6 +132,48 @@
             </div>
         </div>
     </div>
+
+<style>
+.stats-section {
+    margin: 3rem 0;
+}
+
+.stats-section h3 {
+    text-align: center;
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+    color: var(--text-color);
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1.5rem;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.stat-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+</style>
 </div>
 {% endblock %}
 
