@@ -13,9 +13,9 @@ class Config:
     DATABASE_PATH = os.path.join(BASE_DIR, 'voice2note.db')
 
     # Whisper configuration
-    WHISPER_MODEL = 'medium'
+    WHISPER_MODEL = os.getenv('WHISPER_MODEL', 'large-v3')
     WHISPER_PATH = os.path.join(BASE_DIR, 'Whisper', 'build', 'bin', 'whisper-cli')
-    WHISPER_MODEL_PATH = os.path.join(BASE_DIR, 'Whisper', 'models', 'ggml-medium.bin')
+    WHISPER_MODEL_PATH = os.path.join(BASE_DIR, 'Whisper', 'models', f'ggml-{WHISPER_MODEL}.bin')
 
     # Ollama configuration
     OLLAMA_API_KEY = os.getenv('OLLAMA_API_KEY', '1728cbe73f944db7afa1a3c8f52d2f41.GzEVZ8ADdcDHwIxdbvKnqbXy')
