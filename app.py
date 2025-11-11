@@ -490,6 +490,14 @@ def cancel_processing(video_id):
             if video_id in active_processes:
                 # Set cancel flag for active thread
                 active_processes[video_id]['cancel'].set()
+
+                # Immediately update database status to prevent duplicate cancellations
+                db.update_processing_status(video_id, 'cancelled', progress=0,
+                                          error_message='Cancelled by user')
+
+                # Remove from active processes immediately
+                del active_processes[video_id]
+
                 print(f"✓ Cancelled active thread for video {video_id}")
                 return jsonify({'success': True, 'message': 'Processing cancelled'})
             else:
