@@ -287,18 +287,36 @@
     }
 
     function updateProgress(status) {
-        const statusMessages = {
-            'pending': 'Starting processing...',
-            'extracting': 'Extracting audio from video...',
-            'transcribing': 'Transcribing audio to text...',
-            'generating': 'Generating AI-enhanced notes...',
-            'completed': 'Processing complete!',
-            'failed': 'Processing failed',
-            'cancelled': 'Processing cancelled'
+        // More detailed status messages based on progress
+        const getStatusMessage = (statusName, progress) => {
+            if (statusName === 'extracting') {
+                if (progress <= 15) return 'Starting extraction...';
+                if (progress <= 25) return 'Extracting audio from video...';
+                return 'Processing video metadata...';
+            } else if (statusName === 'transcribing') {
+                if (progress <= 35) return 'Loading transcription model...';
+                if (progress <= 40) return 'Starting transcription...';
+                if (progress <= 55) return 'Transcribing audio to text...';
+                return 'Saving transcript...';
+            } else if (statusName === 'generating') {
+                if (progress <= 70) return 'Analyzing transcript...';
+                if (progress <= 80) return 'Generating AI-enhanced notes...';
+                if (progress <= 90) return 'Formatting notes...';
+                return 'Saving notes...';
+            } else if (statusName === 'pending') {
+                return 'Starting processing...';
+            } else if (statusName === 'completed') {
+                return 'Processing complete!';
+            } else if (statusName === 'failed') {
+                return 'Processing failed';
+            } else if (statusName === 'cancelled') {
+                return 'Processing cancelled';
+            }
+            return statusName;
         };
 
         const progress = status.progress || 0;
-        const statusText = statusMessages[status.status] || status.status;
+        const statusText = getStatusMessage(status.status, progress);
 
         document.getElementById('progressBar').style.width = progress + '%';
         document.getElementById('statusText').innerHTML =

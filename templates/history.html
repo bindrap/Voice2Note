@@ -34,11 +34,11 @@
 
                 <!-- Progress bar ONLY for actively processing videos -->
                 {% if video.processing_status and video.processing_status in ['pending', 'extracting', 'transcribing', 'generating'] %}
-                <div class="video-progress" style="margin-top: 0.5rem;">
-                    <div class="progress-bar" style="width: 100%; height: 6px; background: var(--border-color); border-radius: 3px; overflow: hidden;">
-                        <div class="progress-fill" style="height: 100%; background: var(--primary-color); width: 0%; transition: width 0.3s ease;"></div>
+                <div class="video-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill"></div>
                     </div>
-                    <small class="progress-text" style="font-size: 0.75rem; color: var(--text-muted);"></small>
+                    <small class="progress-text"></small>
                 </div>
                 {% endif %}
             </div>
@@ -162,20 +162,40 @@
         const card = document.querySelector(`.video-card[data-video-id="${videoId}"]`);
         if (!card) return;
 
-        const statusMessages = {
-            'pending': 'Starting...',
-            'extracting': 'Extracting audio...',
-            'transcribing': 'Transcribing...',
-            'generating': 'Generating notes...',
-            'completed': 'Completed',
-            'failed': 'Failed',
-            'cancelled': 'Cancelled'
+        // More detailed status messages based on progress
+        const getStatusMessage = (statusName, progress) => {
+            if (statusName === 'extracting') {
+                if (progress <= 15) return 'Starting extraction...';
+                if (progress <= 25) return 'Extracting audio...';
+                return 'Processing metadata...';
+            } else if (statusName === 'transcribing') {
+                if (progress <= 35) return 'Loading model...';
+                if (progress <= 40) return 'Starting transcription...';
+                if (progress <= 55) return 'Transcribing audio...';
+                return 'Saving transcript...';
+            } else if (statusName === 'generating') {
+                if (progress <= 70) return 'Analyzing transcript...';
+                if (progress <= 80) return 'Generating notes...';
+                if (progress <= 90) return 'Formatting notes...';
+                return 'Saving notes...';
+            } else if (statusName === 'pending') {
+                return 'Starting...';
+            } else if (statusName === 'completed') {
+                return 'Completed';
+            } else if (statusName === 'failed') {
+                return 'Failed';
+            } else if (statusName === 'cancelled') {
+                return 'Cancelled';
+            }
+            return statusName;
         };
+
+        const statusMessage = getStatusMessage(status.status, status.progress || 0);
 
         // Update status badge
         const statusBadge = card.querySelector('.status-badge');
         if (statusBadge) {
-            statusBadge.textContent = statusMessages[status.status] || status.status;
+            statusBadge.textContent = status.status.charAt(0).toUpperCase() + status.status.slice(1);
             statusBadge.className = `badge status-badge status-${status.status}`;
         }
 
@@ -188,7 +208,7 @@
         }
 
         if (progressText) {
-            progressText.textContent = `${status.progress || 0}% - ${statusMessages[status.status] || status.status}`;
+            progressText.textContent = `${status.progress || 0}% • ${statusMessage}`;
         }
 
         // Update title if it changed from "Processing..."

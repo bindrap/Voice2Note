@@ -159,7 +159,7 @@ def history():
 def process_video_background(video_id, source, is_file, file_path, cancel_event):
     """Background task to process video"""
     try:
-        # Step 1: Extract audio
+        # Step 1: Extract audio (10-30%)
         print(f"\n{'='*50}")
         print(f"STEP 1: Extracting audio [Video ID: {video_id}]")
         print(f"{'='*50}")
@@ -170,11 +170,17 @@ def process_video_background(video_id, source, is_file, file_path, cancel_event)
         if cancel_event.is_set():
             raise Exception("Processing cancelled by user")
 
+        # Progress: Processing source
+        db.update_processing_status(video_id, 'extracting', progress=15)
+
         metadata = video_handler.process_source(
             source,
             is_file=is_file,
             file_path=file_path
         )
+
+        # Progress: Audio extracted
+        db.update_processing_status(video_id, 'extracting', progress=25)
 
         # Check for cancellation
         if cancel_event.is_set():
@@ -193,9 +199,12 @@ def process_video_background(video_id, source, is_file, file_path, cancel_event)
         conn.commit()
         conn.close()
 
+        # Progress: Metadata saved
+        db.update_processing_status(video_id, 'extracting', progress=28)
+
         db.update_processing_status(video_id, 'transcribing', progress=30)
 
-        # Step 2: Transcribe audio
+        # Step 2: Transcribe audio (30-60%)
         print(f"\n{'='*50}")
         print(f"STEP 2: Transcribing audio [Video ID: {video_id}]")
         print(f"{'='*50}")
@@ -205,8 +214,17 @@ def process_video_background(video_id, source, is_file, file_path, cancel_event)
             video_handler.cleanup_audio(metadata['audio_path'])
             raise Exception("Processing cancelled by user")
 
+        # Progress: Loading transcription model
+        db.update_processing_status(video_id, 'transcribing', progress=35)
+
+        # Progress: Starting transcription
+        db.update_processing_status(video_id, 'transcribing', progress=40)
+
         transcript_result = transcriber.transcribe(metadata['audio_path'])
         transcript_text = transcript_result['transcript_text']
+
+        # Progress: Transcription complete
+        db.update_processing_status(video_id, 'transcribing', progress=55)
 
         # Check for cancellation
         if cancel_event.is_set():
@@ -220,9 +238,12 @@ def process_video_background(video_id, source, is_file, file_path, cancel_event)
             transcript_result.get('timestamps')
         )
 
+        # Progress: Transcript saved
+        db.update_processing_status(video_id, 'transcribing', progress=58)
+
         db.update_processing_status(video_id, 'generating', progress=60)
 
-        # Step 3: Generate notes
+        # Step 3: Generate notes (60-100%)
         print(f"\n{'='*50}")
         print(f"STEP 3: Generating notes [Video ID: {video_id}]")
         print(f"{'='*50}")
@@ -232,7 +253,16 @@ def process_video_background(video_id, source, is_file, file_path, cancel_event)
             video_handler.cleanup_audio(metadata['audio_path'])
             raise Exception("Processing cancelled by user")
 
+        # Progress: Analyzing transcript
+        db.update_processing_status(video_id, 'generating', progress=70)
+
+        # Progress: Generating notes
+        db.update_processing_status(video_id, 'generating', progress=80)
+
         notes = note_generator.generate_notes(transcript_text, metadata)
+
+        # Progress: Formatting notes
+        db.update_processing_status(video_id, 'generating', progress=90)
 
         # Check for cancellation
         if cancel_event.is_set():
@@ -241,6 +271,9 @@ def process_video_background(video_id, source, is_file, file_path, cancel_event)
 
         # Save notes
         db.create_notes(video_id, notes)
+
+        # Progress: Saving notes
+        db.update_processing_status(video_id, 'generating', progress=95)
 
         db.update_processing_status(video_id, 'completed', progress=100)
 
