@@ -21,6 +21,10 @@ video_handler = VideoHandler()
 transcriber = Transcriber()
 note_generator = NoteGenerator()
 
+# Track active processing threads
+active_processes = {}  # {video_id: {'thread': thread_obj, 'cancel': threading.Event()}}
+process_lock = threading.Lock()
+
 
 def login_required(f):
     """Decorator to require login for routes"""
@@ -152,7 +156,7 @@ def history():
     return render_template('history.html', videos=videos)
 
 
-def process_video_background(video_id, source, is_file, file_path):
+def process_video_background(video_id, source, is_file, file_path, cancel_event):
     """Background task to process video"""
     try:
         # Step 1: Extract audio
@@ -162,11 +166,20 @@ def process_video_background(video_id, source, is_file, file_path):
 
         db.update_processing_status(video_id, 'extracting', progress=10)
 
+        # Check for cancellation
+        if cancel_event.is_set():
+            raise Exception("Processing cancelled by user")
+
         metadata = video_handler.process_source(
             source,
             is_file=is_file,
             file_path=file_path
         )
+
+        # Check for cancellation
+        if cancel_event.is_set():
+            video_handler.cleanup_audio(metadata.get('audio_path'))
+            raise Exception("Processing cancelled by user")
 
         # Update video metadata
         conn = db.get_connection()
@@ -187,8 +200,18 @@ def process_video_background(video_id, source, is_file, file_path):
         print(f"STEP 2: Transcribing audio [Video ID: {video_id}]")
         print(f"{'='*50}")
 
+        # Check for cancellation
+        if cancel_event.is_set():
+            video_handler.cleanup_audio(metadata['audio_path'])
+            raise Exception("Processing cancelled by user")
+
         transcript_result = transcriber.transcribe(metadata['audio_path'])
         transcript_text = transcript_result['transcript_text']
+
+        # Check for cancellation
+        if cancel_event.is_set():
+            video_handler.cleanup_audio(metadata['audio_path'])
+            raise Exception("Processing cancelled by user")
 
         # Save transcript
         db.create_transcript(
@@ -204,7 +227,17 @@ def process_video_background(video_id, source, is_file, file_path):
         print(f"STEP 3: Generating notes [Video ID: {video_id}]")
         print(f"{'='*50}")
 
+        # Check for cancellation
+        if cancel_event.is_set():
+            video_handler.cleanup_audio(metadata['audio_path'])
+            raise Exception("Processing cancelled by user")
+
         notes = note_generator.generate_notes(transcript_text, metadata)
+
+        # Check for cancellation
+        if cancel_event.is_set():
+            video_handler.cleanup_audio(metadata['audio_path'])
+            raise Exception("Processing cancelled by user")
 
         # Save notes
         db.create_notes(video_id, notes)
@@ -222,15 +255,23 @@ def process_video_background(video_id, source, is_file, file_path):
 
     except Exception as e:
         error_msg = str(e)
-        print(f"\n❌ Error processing video {video_id}: {error_msg}")
-        traceback.print_exc()
+        is_cancelled = "cancelled" in error_msg.lower()
+
+        print(f"\n❌ {'Cancelled' if is_cancelled else 'Error'} processing video {video_id}: {error_msg}")
+        if not is_cancelled:
+            traceback.print_exc()
 
         db.update_processing_status(
             video_id,
-            'failed',
+            'cancelled' if is_cancelled else 'failed',
             progress=0,
             error_message=error_msg
         )
+    finally:
+        # Remove from active processes
+        with process_lock:
+            if video_id in active_processes:
+                del active_processes[video_id]
 
 
 @app.route('/process', methods=['POST'])
@@ -273,12 +314,21 @@ def process():
         # Initialize processing status
         db.update_processing_status(video_id, 'pending', progress=5)
 
-        # Start background processing
+        # Create cancel event and start background processing
+        cancel_event = threading.Event()
         thread = threading.Thread(
             target=process_video_background,
-            args=(video_id, source, is_file, file_path),
+            args=(video_id, source, is_file, file_path, cancel_event),
             daemon=True
         )
+
+        # Track the thread
+        with process_lock:
+            active_processes[video_id] = {
+                'thread': thread,
+                'cancel': cancel_event
+            }
+
         thread.start()
 
         print(f"✓ Started background processing for video {video_id}")
@@ -382,6 +432,81 @@ def api_search():
     return jsonify(filtered)
 
 
+@app.route('/cancel/<int:video_id>', methods=['POST'])
+@login_required
+def cancel_processing(video_id):
+    """Cancel processing of a video"""
+    try:
+        # Verify ownership
+        video = db.get_video(video_id)
+        if not video or video['user_id'] != session['user_id']:
+            return jsonify({'success': False, 'error': 'Video not found'}), 404
+
+        # Check if video is being processed
+        with process_lock:
+            if video_id in active_processes:
+                # Set cancel flag
+                active_processes[video_id]['cancel'].set()
+                return jsonify({'success': True, 'message': 'Processing cancelled'})
+            else:
+                return jsonify({'success': False, 'error': 'Video is not currently being processed'}), 400
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/restart/<int:video_id>', methods=['POST'])
+@login_required
+def restart_processing(video_id):
+    """Restart processing of a failed or cancelled video"""
+    try:
+        # Verify ownership
+        video = db.get_video(video_id)
+        if not video or video['user_id'] != session['user_id']:
+            return jsonify({'success': False, 'error': 'Video not found'}), 404
+
+        # Check if video can be restarted
+        status = db.get_processing_status(video_id)
+        if status and status['status'] not in ['failed', 'cancelled']:
+            return jsonify({'success': False, 'error': 'Can only restart failed or cancelled videos'}), 400
+
+        # Determine source
+        source = video['source_url'] or video['title']  # Use title as fallback for local files
+        source_type = video['source_type']
+        is_file = source_type == 'local'
+        file_path = None  # For restarts, we'll need to re-download/upload
+
+        if is_file:
+            return jsonify({'success': False, 'error': 'Cannot restart local file uploads - please re-upload the file'}), 400
+
+        # Reset processing status
+        db.update_processing_status(video_id, 'pending', progress=5)
+
+        # Start background processing
+        cancel_event = threading.Event()
+        thread = threading.Thread(
+            target=process_video_background,
+            args=(video_id, source, is_file, file_path, cancel_event),
+            daemon=True
+        )
+
+        # Track the thread
+        with process_lock:
+            active_processes[video_id] = {
+                'thread': thread,
+                'cancel': cancel_event
+            }
+
+        thread.start()
+
+        print(f"✓ Restarted processing for video {video_id}")
+
+        return jsonify({'success': True, 'message': 'Processing restarted', 'video_id': video_id})
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/delete/<int:video_id>', methods=['POST'])
 @login_required
 def delete_video(video_id):
@@ -391,6 +516,11 @@ def delete_video(video_id):
         video = db.get_video(video_id)
         if not video or video['user_id'] != session['user_id']:
             return jsonify({'success': False, 'error': 'Video not found'}), 404
+
+        # Cancel if currently processing
+        with process_lock:
+            if video_id in active_processes:
+                active_processes[video_id]['cancel'].set()
 
         db.delete_video(video_id)
         return jsonify({'success': True, 'message': 'Video deleted successfully'})

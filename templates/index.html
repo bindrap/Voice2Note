@@ -276,6 +276,9 @@
                 } else if (status.status === 'failed') {
                     clearInterval(statusPollInterval);
                     showError(status.error_message || 'Processing failed');
+                } else if (status.status === 'cancelled') {
+                    clearInterval(statusPollInterval);
+                    showError('Processing was cancelled');
                 }
             } catch (error) {
                 console.error('Error polling status:', error);
@@ -290,7 +293,8 @@
             'transcribing': 'Transcribing audio to text...',
             'generating': 'Generating AI-enhanced notes...',
             'completed': 'Processing complete!',
-            'failed': 'Processing failed'
+            'failed': 'Processing failed',
+            'cancelled': 'Processing cancelled'
         };
 
         const progress = status.progress || 0;

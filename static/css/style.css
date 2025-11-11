@@ -542,6 +542,16 @@ body {
     color: #d97706 !important;
 }
 
+.status-cancelled {
+    background: #fee2e2 !important;
+    color: #f59e0b !important;
+}
+
+.status-extracting, .status-transcribing, .status-generating {
+    background: #dbeafe !important;
+    color: #3b82f6 !important;
+}
+
 /* Footer */
 .footer {
     background: var(--card-bg);
