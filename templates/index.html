@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+
+{% block title %}Voice2Note - Home{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="hero">
+        <h2>Convert Videos to AI-Enhanced Notes</h2>
+        <p>Upload a video or paste a YouTube URL to generate comprehensive markdown notes</p>
+    </div>
+
+    <div class="upload-section">
+        <form id="uploadForm" enctype="multipart/form-data">
+            <!-- YouTube URL Input -->
+            <div class="input-group">
+                <label for="youtube_url">YouTube URL</label>
+                <input
+                    type="text"
+                    id="youtube_url"
+                    name="youtube_url"
+                    placeholder="https://youtube.com/watch?v=..."
+                    class="input-field"
+                >
+                <p class="help-text">Paste a YouTube video URL</p>
+            </div>
+
+            <div class="divider">
+                <span>OR</span>
+            </div>
+
+            <!-- File Upload -->
+            <div class="input-group">
+                <label for="video_file">Upload Video File</label>
+                <div class="file-upload">
+                    <input
+                        type="file"
+                        id="video_file"
+                        name="video_file"
+                        accept="video/*,audio/*"
+                        class="file-input"
+                    >
+                    <label for="video_file" class="file-label">
+                        <span class="file-icon">📁</span>
+                        <span id="fileName">Choose a file or drag & drop</span>
+                    </label>
+                </div>
+                <p class="help-text">Supported formats: MP4, AVI, MOV, MKV, WebM, MP3, WAV (max 500MB)</p>
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit" id="submitBtn" class="btn btn-primary">
+                Process Video
+            </button>
+        </form>
+
+        <!-- Progress Section -->
+        <div id="progressSection" class="progress-section" style="display: none;">
+            <h3>Processing...</h3>
+            <div class="progress-bar">
+                <div id="progressBar" class="progress-fill"></div>
+            </div>
+            <p id="statusText" class="status-text">Initializing...</p>
+        </div>
+
+        <!-- Result Section -->
+        <div id="resultSection" class="result-section" style="display: none;">
+            <div class="success-message">
+                <h3>✓ Processing Complete!</h3>
+                <p id="resultTitle"></p>
+                <div class="result-actions">
+                    <a id="viewNotesBtn" href="#" class="btn btn-primary">View Notes</a>
+                    <a id="downloadBtn" href="#" class="btn btn-secondary">Download Markdown</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Section -->
+        <div id="errorSection" class="error-section" style="display: none;">
+            <div class="error-message">
+                <h3>❌ Processing Failed</h3>
+                <p id="errorText"></p>
+                <button onclick="location.reload()" class="btn btn-secondary">Try Again</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="features">
+        <h3>How it works</h3>
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🎬</div>
+                <h4>1. Upload Video</h4>
+                <p>Paste a YouTube URL or upload your video file</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🎙️</div>
+                <h4>2. Transcribe</h4>
+                <p>AI transcribes the audio with high accuracy</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📝</div>
+                <h4>3. Generate Notes</h4>
+                <p>AI creates structured, comprehensive notes</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">💾</div>
+                <h4>4. Download</h4>
+                <p>Get your notes in markdown format</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const form = document.getElementById('uploadForm');
+    const fileInput = document.getElementById('video_file');
+    const fileName = document.getElementById('fileName');
+    const progressSection = document.getElementById('progressSection');
+    const resultSection = document.getElementById('resultSection');
+    const errorSection = document.getElementById('errorSection');
+    const submitBtn = document.getElementById('submitBtn');
+
+    // File input handling
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            fileName.textContent = e.target.files[0].name;
+        }
+    });
+
+    // Form submission
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const youtubeUrl = document.getElementById('youtube_url').value.trim();
+        const videoFile = fileInput.files[0];
+
+        if (!youtubeUrl && !videoFile) {
+            alert('Please provide a YouTube URL or upload a video file');
+            return;
+        }
+
+        // Hide previous results
+        resultSection.style.display = 'none';
+        errorSection.style.display = 'none';
+        progressSection.style.display = 'block';
+
+        // Disable submit button
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Processing...';
+
+        // Prepare form data
+        const formData = new FormData();
+        if (youtubeUrl) {
+            formData.append('youtube_url', youtubeUrl);
+        }
+        if (videoFile) {
+            formData.append('video_file', videoFile);
+        }
+
+        try {
+            const response = await fetch('/process', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Show success
+                progressSection.style.display = 'none';
+                resultSection.style.display = 'block';
+                document.getElementById('resultTitle').textContent = data.title;
+                document.getElementById('viewNotesBtn').href = `/notes/${data.video_id}`;
+                document.getElementById('downloadBtn').href = `/download/${data.video_id}`;
+            } else {
+                // Show error
+                progressSection.style.display = 'none';
+                errorSection.style.display = 'block';
+                document.getElementById('errorText').textContent = data.error || 'Unknown error occurred';
+            }
+        } catch (error) {
+            // Show error
+            progressSection.style.display = 'none';
+            errorSection.style.display = 'block';
+            document.getElementById('errorText').textContent = error.message;
+        } finally {
+            // Re-enable submit button
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Process Video';
+        }
+    });
+
+    // Simulated progress updates (you can implement real-time updates via WebSocket)
+    function updateProgress(status, progress) {
+        document.getElementById('progressBar').style.width = progress + '%';
+        document.getElementById('statusText').textContent = status;
+    }
+</script>
+{% endblock %}

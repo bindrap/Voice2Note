@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Notes - {{ video.title }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="notes-header">
+        <div class="notes-meta">
+            <h2>{{ video.title }}</h2>
+            {% if video.creator %}
+            <p class="creator">By {{ video.creator }}</p>
+            {% endif %}
+            <div class="meta-info">
+                {% if video.duration %}
+                <span class="badge">⏱️ {{ (video.duration // 60) }} minutes</span>
+                {% endif %}
+                <span class="badge">📅 {{ video.processed_date }}</span>
+            </div>
+        </div>
+        <div class="notes-actions">
+            <a href="/download/{{ video.id }}" class="btn btn-primary">
+                📥 Download Markdown
+            </a>
+            <a href="/" class="btn btn-secondary">
+                ← Process Another
+            </a>
+        </div>
+    </div>
+
+    <div class="notes-content">
+        <div id="markdown-content">
+            {{ notes.content | safe }}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+    // Render markdown
+    const markdownContent = document.getElementById('markdown-content');
+    const rawMarkdown = markdownContent.textContent;
+    markdownContent.innerHTML = marked.parse(rawMarkdown);
+
+    // Add syntax highlighting if needed
+    document.querySelectorAll('pre code').forEach((block) => {
+        block.classList.add('code-block');
+    });
+</script>
+{% endblock %}

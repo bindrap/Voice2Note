@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+virtualEnv/
+venv/
+.env
+
+# Temp files
+temp/
+*.wav
+*.mp3
+*.mp4
+
+# Database
+*.db
+*.sqlite
+
+# Whisper models (too large for git)
+Whisper/models/*.bin
+models/*.bin
+
+# Whisper build artifacts
+Whisper/build/
+
+# Notes output
+notes/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

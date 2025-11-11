@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Processing History{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2>Processing History</h2>
+        <a href="/" class="btn btn-primary">+ New Video</a>
+    </div>
+
+    {% if videos %}
+    <div class="video-list">
+        {% for video in videos %}
+        <div class="video-card">
+            <div class="video-info">
+                <h3>{{ video.title }}</h3>
+                {% if video.creator %}
+                <p class="creator">{{ video.creator }}</p>
+                {% endif %}
+                <div class="meta-info">
+                    {% if video.duration %}
+                    <span class="badge">⏱️ {{ (video.duration // 60) }} min</span>
+                    {% endif %}
+                    <span class="badge">📅 {{ video.processed_date }}</span>
+
+                    {% if video.processing_status %}
+                    <span class="badge status-{{ video.processing_status }}">
+                        {{ video.processing_status | capitalize }}
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="video-actions">
+                {% if video.notes_id %}
+                <a href="/notes/{{ video.id }}" class="btn btn-sm btn-primary">View Notes</a>
+                <a href="/download/{{ video.id }}" class="btn btn-sm btn-secondary">Download</a>
+                {% else %}
+                <span class="text-muted">No notes available</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">📭</div>
+        <h3>No videos processed yet</h3>
+        <p>Upload a video or paste a YouTube URL to get started!</p>
+        <a href="/" class="btn btn-primary">Get Started</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
