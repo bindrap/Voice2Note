@@ -2,6 +2,56 @@
 
 Convert videos and YouTube links into AI-enhanced markdown notes automatically.
 
+## 🚀 Production Deployment
+
+**Live on Tailscale Network:**
+- **Server**: rainydaze (Oracle Cloud, 22GB RAM)
+- **Access**: `http://100.123.132.122:5000`
+- **Model**: Whisper large-v3 (best quality)
+- **Workers**: 8 Gunicorn workers
+- **Status**: ✅ Production Ready
+
+### Quick Production Setup
+```bash
+# Clone and setup
+git clone git@github.com:bindrap/Voice2Note.git
+cd Voice2Note
+
+# Install dependencies
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt gunicorn
+
+# Build whisper.cpp
+cd Whisper
+git clone https://github.com/ggml-org/whisper.cpp.git .
+cmake -B build && cmake --build build -j --config Release
+bash ./models/download-ggml-model.sh large-v3
+cd ..
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your SECRET_KEY and settings
+
+# Initialize database
+python init_db.py
+
+# Configure firewall (Oracle Linux)
+sudo firewall-cmd --permanent --add-port=5000/tcp
+sudo firewall-cmd --permanent --add-interface=tailscale0 --zone=trusted
+sudo firewall-cmd --reload
+
+# Start production server
+gunicorn -w 8 -b 0.0.0.0:5000 --timeout 1800 app:app --daemon
+```
+
+### Production Configuration
+- **OS Firewall**: Port 5000/tcp open, Tailscale interface trusted
+- **Workers**: 8 (optimal for 22GB RAM, multi-user)
+- **Timeout**: 1800s (30 minutes for long videos)
+- **Model**: large-v3 (3GB, best transcription quality)
+- **Upload Limit**: 1GB (configurable in .env)
+
 ## Features
 
 ### Core Functionality
@@ -163,7 +213,25 @@ For production, use a WSGI server like Gunicorn:
 \`\`\`bash
 pip install gunicorn
 
-gunicorn -w 4 -b 0.0.0.0:5000 app:app
+# Run with appropriate workers and timeout
+gunicorn -w 8 -b 0.0.0.0:5000 --timeout 1800 app:app
+
+# Or run as daemon (background)
+gunicorn -w 8 -b 0.0.0.0:5000 --timeout 1800 app:app --daemon
+\`\`\`
+
+**Production Server Management:**
+\`\`\`bash
+# Check if running
+ps aux | grep gunicorn | grep 5000
+
+# Stop server
+pkill -f "gunicorn.*5000.*app:app"
+
+# Restart server
+cd /path/to/Voice2Note
+source venv/bin/activate
+gunicorn -w 8 -b 0.0.0.0:5000 --timeout 1800 app:app --daemon
 \`\`\`
 
 Or use the provided systemd service (Linux):
