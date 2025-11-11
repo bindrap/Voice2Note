@@ -24,15 +24,16 @@
                     {% endif %}
                     <span class="badge">📅 {{ video.processed_date }}</span>
 
-                    {% if video.processing_status %}
+                    <!-- Only show status badge for actively processing videos -->
+                    {% if video.processing_status and video.processing_status in ['pending', 'extracting', 'transcribing', 'generating'] %}
                     <span class="badge status-badge status-{{ video.processing_status }}">
                         {{ video.processing_status | capitalize }}
                     </span>
                     {% endif %}
                 </div>
 
-                <!-- Progress bar for processing videos -->
-                {% if video.processing_status and video.processing_status not in ['completed', 'failed'] %}
+                <!-- Progress bar ONLY for actively processing videos -->
+                {% if video.processing_status and video.processing_status in ['pending', 'extracting', 'transcribing', 'generating'] %}
                 <div class="video-progress" style="margin-top: 0.5rem;">
                     <div class="progress-bar" style="width: 100%; height: 6px; background: var(--border-color); border-radius: 3px; overflow: hidden;">
                         <div class="progress-fill" style="height: 100%; background: var(--primary-color); width: 0%; transition: width 0.3s ease;"></div>
@@ -54,7 +55,6 @@
                 <button onclick="cancelProcessing({{ video.id }})" class="btn btn-sm btn-cancel" title="Cancel processing">
                     Cancel
                 </button>
-                <span class="text-muted">Processing...</span>
                 {% elif video.processing_status in ['failed', 'cancelled'] %}
                 <!-- Failed/Cancelled videos - show restart and delete -->
                 {% if video.source_type == 'youtube' %}
@@ -65,19 +65,11 @@
                 <button onclick="deleteVideo({{ video.id }})" class="btn btn-sm btn-delete" title="Delete video">
                     Delete
                 </button>
-                <span class="text-muted error-status">
-                    {% if video.processing_status == 'cancelled' %}
-                    Cancelled
-                    {% else %}
-                    Failed
-                    {% endif %}
-                </span>
                 {% else %}
-                <!-- Default/Unknown status -->
+                <!-- Default/Unknown status - allow deletion -->
                 <button onclick="deleteVideo({{ video.id }})" class="btn btn-sm btn-delete" title="Delete video">
                     Delete
                 </button>
-                <span class="text-muted">No notes available</span>
                 {% endif %}
             </div>
         </div>
