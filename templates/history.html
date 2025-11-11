@@ -12,9 +12,9 @@
     {% if videos %}
     <div class="video-list">
         {% for video in videos %}
-        <div class="video-card">
+        <div class="video-card" data-video-id="{{ video.id }}" data-status="{{ video.processing_status }}">
             <div class="video-info">
-                <h3>{{ video.title }}</h3>
+                <h3 class="video-title">{{ video.title }}</h3>
                 {% if video.creator %}
                 <p class="creator">{{ video.creator }}</p>
                 {% endif %}
@@ -25,18 +25,36 @@
                     <span class="badge">📅 {{ video.processed_date }}</span>
 
                     {% if video.processing_status %}
-                    <span class="badge status-{{ video.processing_status }}">
+                    <span class="badge status-badge status-{{ video.processing_status }}">
                         {{ video.processing_status | capitalize }}
                     </span>
                     {% endif %}
                 </div>
+
+                <!-- Progress bar for processing videos -->
+                {% if video.processing_status and video.processing_status not in ['completed', 'failed'] %}
+                <div class="video-progress" style="margin-top: 0.5rem;">
+                    <div class="progress-bar" style="width: 100%; height: 6px; background: var(--border-color); border-radius: 3px; overflow: hidden;">
+                        <div class="progress-fill" style="height: 100%; background: var(--primary-color); width: 0%; transition: width 0.3s ease;"></div>
+                    </div>
+                    <small class="progress-text" style="font-size: 0.75rem; color: var(--text-muted);"></small>
+                </div>
+                {% endif %}
             </div>
             <div class="video-actions">
                 {% if video.notes_id %}
                 <a href="/notes/{{ video.id }}" class="btn btn-sm btn-primary">View Notes</a>
                 <a href="/download/{{ video.id }}" class="btn btn-sm btn-secondary">Download</a>
                 {% else %}
-                <span class="text-muted">No notes available</span>
+                <span class="text-muted processing-message">
+                    {% if video.processing_status in ['completed'] %}
+                    No notes available
+                    {% elif video.processing_status in ['failed'] %}
+                    Processing failed
+                    {% else %}
+                    Processing...
+                    {% endif %}
+                </span>
                 {% endif %}
             </div>
         </div>
@@ -51,4 +69,98 @@
     </div>
     {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Poll for status updates on processing videos
+    const processingVideos = new Set();
+    const statusIntervals = {};
+
+    // Find all processing videos on page load
+    document.querySelectorAll('.video-card').forEach(card => {
+        const videoId = parseInt(card.dataset.videoId);
+        const status = card.dataset.status;
+
+        if (status && !['completed', 'failed'].includes(status)) {
+            processingVideos.add(videoId);
+            startStatusPolling(videoId);
+        }
+    });
+
+    function startStatusPolling(videoId) {
+        // Poll every 2 seconds
+        statusIntervals[videoId] = setInterval(async () => {
+            try {
+                const response = await fetch(`/status/${videoId}`);
+                const status = await response.json();
+
+                updateVideoStatus(videoId, status);
+
+                // Stop polling if complete or failed
+                if (['completed', 'failed'].includes(status.status)) {
+                    clearInterval(statusIntervals[videoId]);
+                    processingVideos.delete(videoId);
+
+                    // Reload page to show updated content after a short delay
+                    setTimeout(() => window.location.reload(), 1000);
+                }
+            } catch (error) {
+                console.error(`Error polling status for video ${videoId}:`, error);
+            }
+        }, 2000);
+    }
+
+    function updateVideoStatus(videoId, status) {
+        const card = document.querySelector(`.video-card[data-video-id="${videoId}"]`);
+        if (!card) return;
+
+        const statusMessages = {
+            'pending': 'Starting...',
+            'extracting': 'Extracting audio...',
+            'transcribing': 'Transcribing...',
+            'generating': 'Generating notes...',
+            'completed': 'Completed',
+            'failed': 'Failed'
+        };
+
+        // Update status badge
+        const statusBadge = card.querySelector('.status-badge');
+        if (statusBadge) {
+            statusBadge.textContent = statusMessages[status.status] || status.status;
+            statusBadge.className = `badge status-badge status-${status.status}`;
+        }
+
+        // Update progress bar
+        const progressFill = card.querySelector('.progress-fill');
+        const progressText = card.querySelector('.progress-text');
+
+        if (progressFill) {
+            progressFill.style.width = (status.progress || 0) + '%';
+        }
+
+        if (progressText) {
+            progressText.textContent = `${status.progress || 0}% - ${statusMessages[status.status] || status.status}`;
+        }
+
+        // Update title if it changed from "Processing..."
+        const titleElement = card.querySelector('.video-title');
+        if (titleElement && titleElement.textContent === 'Processing...') {
+            // Fetch updated video info
+            fetch(`/api/videos`)
+                .then(res => res.json())
+                .then(videos => {
+                    const video = videos.find(v => v.id === videoId);
+                    if (video && video.title !== 'Processing...') {
+                        titleElement.textContent = video.title;
+                    }
+                });
+        }
+    }
+
+    // Clean up intervals when leaving the page
+    window.addEventListener('beforeunload', () => {
+        Object.values(statusIntervals).forEach(interval => clearInterval(interval));
+    });
+</script>
 {% endblock %}

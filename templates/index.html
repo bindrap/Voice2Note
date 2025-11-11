@@ -194,6 +194,8 @@
         }
     });
 
+    let statusPollInterval = null;
+
     // Form submission
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -213,7 +215,7 @@
 
         // Disable submit button
         submitBtn.disabled = true;
-        submitBtn.textContent = 'Processing...';
+        submitBtn.textContent = 'Starting...';
 
         // Prepare form data
         const formData = new FormData();
@@ -232,35 +234,93 @@
 
             const data = await response.json();
 
-            if (data.success) {
-                // Show success
-                progressSection.style.display = 'none';
-                resultSection.style.display = 'block';
-                document.getElementById('resultTitle').textContent = data.title;
-                document.getElementById('viewNotesBtn').href = `/notes/${data.video_id}`;
-                document.getElementById('downloadBtn').href = `/download/${data.video_id}`;
+            if (data.success && data.processing) {
+                // Processing started in background - poll for status
+                document.getElementById('statusText').innerHTML =
+                    data.message + '<br><small>You can navigate away - processing continues in background</small>';
+                startStatusPolling(data.video_id);
+            } else if (data.success) {
+                // Immediate success (shouldn't happen with new background processing)
+                showSuccess(data.video_id, data.title);
             } else {
-                // Show error
-                progressSection.style.display = 'none';
-                errorSection.style.display = 'block';
-                document.getElementById('errorText').textContent = data.error || 'Unknown error occurred';
+                // Error
+                showError(data.error || 'Unknown error occurred');
             }
         } catch (error) {
-            // Show error
-            progressSection.style.display = 'none';
-            errorSection.style.display = 'block';
-            document.getElementById('errorText').textContent = error.message;
-        } finally {
-            // Re-enable submit button
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Process Video';
+            showError(error.message);
         }
     });
 
-    // Simulated progress updates (you can implement real-time updates via WebSocket)
-    function updateProgress(status, progress) {
+    function startStatusPolling(videoId) {
+        // Clear any existing interval
+        if (statusPollInterval) {
+            clearInterval(statusPollInterval);
+        }
+
+        // Poll every 2 seconds
+        statusPollInterval = setInterval(async () => {
+            try {
+                const response = await fetch(`/status/${videoId}`);
+                const status = await response.json();
+
+                updateProgress(status);
+
+                // Check if processing is complete
+                if (status.status === 'completed') {
+                    clearInterval(statusPollInterval);
+                    // Fetch video details to get title
+                    const videoResponse = await fetch(`/api/videos`);
+                    const videos = await videoResponse.json();
+                    const video = videos.find(v => v.id === videoId);
+                    showSuccess(videoId, video ? video.title : 'Video');
+                } else if (status.status === 'failed') {
+                    clearInterval(statusPollInterval);
+                    showError(status.error_message || 'Processing failed');
+                }
+            } catch (error) {
+                console.error('Error polling status:', error);
+            }
+        }, 2000);
+    }
+
+    function updateProgress(status) {
+        const statusMessages = {
+            'pending': 'Starting processing...',
+            'extracting': 'Extracting audio from video...',
+            'transcribing': 'Transcribing audio to text...',
+            'generating': 'Generating AI-enhanced notes...',
+            'completed': 'Processing complete!',
+            'failed': 'Processing failed'
+        };
+
+        const progress = status.progress || 0;
+        const statusText = statusMessages[status.status] || status.status;
+
         document.getElementById('progressBar').style.width = progress + '%';
-        document.getElementById('statusText').textContent = status;
+        document.getElementById('statusText').innerHTML =
+            `${statusText}<br><small>${progress}% complete</small>`;
+    }
+
+    function showSuccess(videoId, title) {
+        progressSection.style.display = 'none';
+        resultSection.style.display = 'block';
+        document.getElementById('resultTitle').textContent = title;
+        document.getElementById('viewNotesBtn').href = `/notes/${videoId}`;
+        document.getElementById('downloadBtn').href = `/download/${videoId}`;
+
+        // Re-enable submit button
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Process Video';
+    }
+
+    function showError(errorMessage) {
+        progressSection.style.display = 'none';
+        errorSection.style.display = 'block';
+        document.getElementById('errorText').textContent = errorMessage;
+
+        // Re-enable submit button
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Process Video';
     }
 </script>
 {% endblock %}

@@ -3,6 +3,7 @@ import os
 import traceback
 from werkzeug.utils import secure_filename
 from functools import wraps
+import threading
 from config import Config
 from database.db_manager import DatabaseManager
 from processors.video_handler import VideoHandler
@@ -151,10 +152,91 @@ def history():
     return render_template('history.html', videos=videos)
 
 
+def process_video_background(video_id, source, is_file, file_path):
+    """Background task to process video"""
+    try:
+        # Step 1: Extract audio
+        print(f"\n{'='*50}")
+        print(f"STEP 1: Extracting audio [Video ID: {video_id}]")
+        print(f"{'='*50}")
+
+        db.update_processing_status(video_id, 'extracting', progress=10)
+
+        metadata = video_handler.process_source(
+            source,
+            is_file=is_file,
+            file_path=file_path
+        )
+
+        # Update video metadata
+        conn = db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE videos
+            SET title = ?, creator = ?, duration = ?, source_url = ?
+            WHERE id = ?
+        ''', (metadata['title'], metadata.get('channel'), metadata.get('duration'),
+              metadata.get('url'), video_id))
+        conn.commit()
+        conn.close()
+
+        db.update_processing_status(video_id, 'transcribing', progress=30)
+
+        # Step 2: Transcribe audio
+        print(f"\n{'='*50}")
+        print(f"STEP 2: Transcribing audio [Video ID: {video_id}]")
+        print(f"{'='*50}")
+
+        transcript_result = transcriber.transcribe(metadata['audio_path'])
+        transcript_text = transcript_result['transcript_text']
+
+        # Save transcript
+        db.create_transcript(
+            video_id,
+            transcript_text,
+            transcript_result.get('timestamps')
+        )
+
+        db.update_processing_status(video_id, 'generating', progress=60)
+
+        # Step 3: Generate notes
+        print(f"\n{'='*50}")
+        print(f"STEP 3: Generating notes [Video ID: {video_id}]")
+        print(f"{'='*50}")
+
+        notes = note_generator.generate_notes(transcript_text, metadata)
+
+        # Save notes
+        db.create_notes(video_id, notes)
+
+        db.update_processing_status(video_id, 'completed', progress=100)
+
+        # Cleanup
+        video_handler.cleanup_audio(metadata['audio_path'])
+        if file_path and os.path.exists(file_path):
+            os.remove(file_path)
+
+        print(f"\n{'='*50}")
+        print(f"✓ Processing completed successfully! [Video ID: {video_id}]")
+        print(f"{'='*50}\n")
+
+    except Exception as e:
+        error_msg = str(e)
+        print(f"\n❌ Error processing video {video_id}: {error_msg}")
+        traceback.print_exc()
+
+        db.update_processing_status(
+            video_id,
+            'failed',
+            progress=0,
+            error_message=error_msg
+        )
+
+
 @app.route('/process', methods=['POST'])
 @login_required
 def process():
-    """Process video/audio from URL or upload"""
+    """Process video/audio from URL or upload - starts background processing"""
     try:
         # Get input source
         youtube_url = request.form.get('youtube_url', '').strip()
@@ -188,91 +270,31 @@ def process():
             title='Processing...',
         )
 
-        # Update status
-        db.update_processing_status(video_id, 'extracting', progress=10)
+        # Initialize processing status
+        db.update_processing_status(video_id, 'pending', progress=5)
 
-        # Step 1: Extract audio
-        print(f"\n{'='*50}")
-        print(f"STEP 1: Extracting audio")
-        print(f"{'='*50}")
-
-        metadata = video_handler.process_source(
-            source,
-            is_file=is_file,
-            file_path=file_path
+        # Start background processing
+        thread = threading.Thread(
+            target=process_video_background,
+            args=(video_id, source, is_file, file_path),
+            daemon=True
         )
+        thread.start()
 
-        # Update video metadata
-        conn = db.get_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            UPDATE videos
-            SET title = ?, creator = ?, duration = ?, source_url = ?
-            WHERE id = ?
-        ''', (metadata['title'], metadata.get('channel'), metadata.get('duration'),
-              metadata.get('url'), video_id))
-        conn.commit()
-        conn.close()
+        print(f"✓ Started background processing for video {video_id}")
 
-        db.update_processing_status(video_id, 'transcribing', progress=30)
-
-        # Step 2: Transcribe audio
-        print(f"\n{'='*50}")
-        print(f"STEP 2: Transcribing audio")
-        print(f"{'='*50}")
-
-        transcript_result = transcriber.transcribe(metadata['audio_path'])
-        transcript_text = transcript_result['transcript_text']
-
-        # Save transcript
-        db.create_transcript(
-            video_id,
-            transcript_text,
-            transcript_result.get('timestamps')
-        )
-
-        db.update_processing_status(video_id, 'generating', progress=60)
-
-        # Step 3: Generate notes
-        print(f"\n{'='*50}")
-        print(f"STEP 3: Generating notes")
-        print(f"{'='*50}")
-
-        notes = note_generator.generate_notes(transcript_text, metadata)
-
-        # Save notes
-        db.create_notes(video_id, notes)
-
-        db.update_processing_status(video_id, 'completed', progress=100)
-
-        # Cleanup
-        video_handler.cleanup_audio(metadata['audio_path'])
-        if file_path and os.path.exists(file_path):
-            os.remove(file_path)
-
-        print(f"\n{'='*50}")
-        print(f"✓ Processing completed successfully!")
-        print(f"{'='*50}\n")
-
+        # Return immediately
         return jsonify({
             'success': True,
             'video_id': video_id,
-            'title': metadata['title'],
-            'message': 'Processing completed successfully!'
+            'message': 'Processing started in background. You can navigate away and check progress later.',
+            'processing': True
         })
 
     except Exception as e:
         error_msg = str(e)
         print(f"\n❌ Error: {error_msg}")
         traceback.print_exc()
-
-        if 'video_id' in locals():
-            db.update_processing_status(
-                video_id,
-                'failed',
-                progress=0,
-                error_message=error_msg
-            )
 
         return jsonify({'success': False, 'error': error_msg}), 500
 
