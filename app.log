@@ -1,0 +1,16 @@
+ * Tip: There are .env or .flaskenv files present. Do "pip install python-dotenv" to use them.
+
+============================================================
+Voice2Note Application Starting
+============================================================
+Database: /home/opc/Desktop/Voice2Note/voice2note.db
+Temp directory: /home/opc/Desktop/Voice2Note/temp
+Notes directory: /home/opc/Desktop/Voice2Note/notes
+Whisper model: large-v3
+Ollama model: gpt-oss:120b
+============================================================
+
+ * Serving Flask app 'app'
+ * Debug mode: on
+Address already in use
+Port 5000 is in use by another program. Either identify and stop that program, or start the server with a different port.

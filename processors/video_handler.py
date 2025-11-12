@@ -9,6 +9,8 @@ class VideoHandler:
 
     def __init__(self):
         self.temp_dir = Config.TEMP_DIR
+        # Look for cookies.txt in project root
+        self.cookies_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'cookies.txt')
 
     def is_youtube_url(self, source):
         """Check if source is a YouTube URL"""
@@ -21,7 +23,8 @@ class VideoHandler:
         """
         output_template = os.path.join(self.temp_dir, '%(id)s.%(ext)s')
 
-        ydl_opts = {
+        # Base options that work for most videos
+        base_opts = {
             'format': 'bestaudio/best',
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
@@ -31,39 +34,100 @@ class VideoHandler:
             'outtmpl': output_template,
             'quiet': False,
             'no_warnings': False,
-            # Enhanced options to bypass 403 errors
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['android', 'web'],
-                    'player_skip': ['webpage', 'configs'],
-                }
-            },
-            'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'en-us,en;q=0.5',
-                'Sec-Fetch-Mode': 'navigate',
-            },
+            'nocheckcertificate': True,
+            'ignoreerrors': False,
+            'no_color': True,
+            'extract_flat': False,
         }
 
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
+        # Try different configurations in order of preference
+        config_attempts = []
 
-                audio_path = os.path.join(self.temp_dir, f"{info['id']}.wav")
+        # If cookies.txt exists, try it first
+        if os.path.exists(self.cookies_file):
+            print(f"Found cookies.txt at {self.cookies_file}")
+            config_attempts.append({
+                **base_opts,
+                'cookiefile': self.cookies_file,
+                'extractor_args': {
+                    'youtube': {
+                        'player_client': ['ios', 'android', 'web'],
+                    }
+                },
+            })
 
-                return {
-                    'audio_path': audio_path,
-                    'title': info.get('title', 'Unknown'),
-                    'channel': info.get('uploader', 'Unknown'),
-                    'duration': info.get('duration', 0),
-                    'video_id': info.get('id', ''),
-                    'url': url,
-                    'description': info.get('description', ''),
-                    'chapters': info.get('chapters', []),
-                }
-        except Exception as e:
-            raise Exception(f"Failed to download YouTube video: {str(e)}")
+        # Standard attempts
+        config_attempts.extend([
+            # Attempt 1: iOS client (works for most videos)
+            {
+                **base_opts,
+                'extractor_args': {
+                    'youtube': {
+                        'player_client': ['ios'],
+                        'player_skip': ['configs'],
+                    }
+                },
+                'http_headers': {
+                    'User-Agent': 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)',
+                },
+            },
+            # Attempt 2: Android client with browser cookies
+            {
+                **base_opts,
+                'extractor_args': {
+                    'youtube': {
+                        'player_client': ['android', 'web'],
+                    }
+                },
+                'cookiesfrombrowser': ('chrome',),
+            },
+            # Attempt 3: Try firefox cookies
+            {
+                **base_opts,
+                'extractor_args': {
+                    'youtube': {
+                        'player_client': ['android', 'web'],
+                    }
+                },
+                'cookiesfrombrowser': ('firefox',),
+            },
+            # Attempt 4: Basic android client without cookies
+            {
+                **base_opts,
+                'extractor_args': {
+                    'youtube': {
+                        'player_client': ['android'],
+                    }
+                },
+            },
+        ])
+
+        last_error = None
+        for i, ydl_opts in enumerate(config_attempts):
+            try:
+                print(f"Download attempt {i+1}/{len(config_attempts)}...")
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url, download=True)
+
+                    audio_path = os.path.join(self.temp_dir, f"{info['id']}.wav")
+
+                    return {
+                        'audio_path': audio_path,
+                        'title': info.get('title', 'Unknown'),
+                        'channel': info.get('uploader', 'Unknown'),
+                        'duration': info.get('duration', 0),
+                        'video_id': info.get('id', ''),
+                        'url': url,
+                        'description': info.get('description', ''),
+                        'chapters': info.get('chapters', []),
+                    }
+            except Exception as e:
+                last_error = str(e)
+                print(f"Attempt {i+1} failed: {e}")
+                continue
+
+        # All attempts failed
+        raise Exception(f"Failed to download YouTube video after {len(config_attempts)} attempts. Last error: {last_error}")
 
     def extract_local_audio(self, video_path, video_id=None):
         """
