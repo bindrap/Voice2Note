@@ -1,6 +1,6 @@
 import os
 import subprocess
-import yt_dlp
+import json
 from config import Config
 
 
@@ -18,116 +18,130 @@ class VideoHandler:
 
     def download_youtube_audio(self, url):
         """
-        Download audio from YouTube video
+        Download video from YouTube, extract audio, delete video
         Returns: dict with audio_path and metadata
         """
-        output_template = os.path.join(self.temp_dir, '%(id)s.%(ext)s')
+        # Use global yt-dlp binary
+        yt_dlp_bin = Config.YT_DLP_PATH
 
-        # Base options that work for most videos
-        base_opts = {
-            'format': 'bestaudio/best',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'wav',
-                'preferredquality': '192',
-            }],
-            'outtmpl': output_template,
-            'quiet': False,
-            'no_warnings': False,
-            'nocheckcertificate': True,
-            'ignoreerrors': False,
-            'no_color': True,
-            'extract_flat': False,
-        }
+        # Extract video ID from URL
+        import re
+        video_id_match = re.search(r'(?:v=|\/)([0-9A-Za-z_-]{11}).*', url)
+        if video_id_match:
+            video_id = video_id_match.group(1)
+        else:
+            video_id = 'unknown'
 
-        # Try different configurations in order of preference
-        config_attempts = []
+        print(f"Processing YouTube video: {video_id}")
 
-        # If cookies.txt exists, try it first
-        if os.path.exists(self.cookies_file):
-            print(f"Found cookies.txt at {self.cookies_file}")
-            config_attempts.append({
-                **base_opts,
-                'cookiefile': self.cookies_file,
-                'extractor_args': {
-                    'youtube': {
-                        'player_client': ['ios', 'android', 'web'],
-                    }
-                },
-            })
+        # Download video file (this works reliably and gets metadata)
+        video_file = None
+        output_template = os.path.join(self.temp_dir, f"{video_id}.%(ext)s")
 
-        # Standard attempts
-        config_attempts.extend([
-            # Attempt 1: iOS client (works for most videos)
-            {
-                **base_opts,
-                'extractor_args': {
-                    'youtube': {
-                        'player_client': ['ios'],
-                        'player_skip': ['configs'],
-                    }
-                },
-                'http_headers': {
-                    'User-Agent': 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)',
-                },
-            },
-            # Attempt 2: Android client with browser cookies
-            {
-                **base_opts,
-                'extractor_args': {
-                    'youtube': {
-                        'player_client': ['android', 'web'],
-                    }
-                },
-                'cookiesfrombrowser': ('chrome',),
-            },
-            # Attempt 3: Try firefox cookies
-            {
-                **base_opts,
-                'extractor_args': {
-                    'youtube': {
-                        'player_client': ['android', 'web'],
-                    }
-                },
-                'cookiesfrombrowser': ('firefox',),
-            },
-            # Attempt 4: Basic android client without cookies
-            {
-                **base_opts,
-                'extractor_args': {
-                    'youtube': {
-                        'player_client': ['android'],
-                    }
-                },
-            },
-        ])
+        try:
+            print("Downloading video...")
+            download_cmd = [
+                yt_dlp_bin,
+                '-o', output_template,
+                '--no-playlist',
+                '--cookies-from-browser', 'firefox',
+                url
+            ]
 
-        last_error = None
-        for i, ydl_opts in enumerate(config_attempts):
+            result = subprocess.run(
+                download_cmd,
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=1800  # 30 minutes timeout
+            )
+
+            # Find the downloaded video file (could be .mp4, .webm, etc.)
+            possible_extensions = ['mp4', 'webm', 'mkv', 'flv']
+            video_file = None
+            for ext in possible_extensions:
+                test_path = os.path.join(self.temp_dir, f"{video_id}.{ext}")
+                if os.path.exists(test_path):
+                    video_file = test_path
+                    break
+
+            if not video_file or not os.path.exists(video_file):
+                raise Exception(f"Video file not found after download")
+
+            print(f"✓ Video downloaded: {video_file}")
+
+            # Extract audio using ffmpeg
+            audio_path = os.path.join(self.temp_dir, f"{video_id}.wav")
+            print(f"Extracting audio to: {audio_path}")
+
+            ffmpeg_cmd = [
+                'ffmpeg',
+                '-i', video_file,
+                '-vn',  # No video
+                '-acodec', 'pcm_s16le',  # 16-bit PCM
+                '-ar', '16000',  # 16kHz sample rate (Whisper requirement)
+                '-ac', '1',  # Mono
+                '-y',  # Overwrite output file
+                audio_path
+            ]
+
+            subprocess.run(ffmpeg_cmd, capture_output=True, text=True, check=True, timeout=600)
+
+            if not os.path.exists(audio_path):
+                raise Exception(f"Audio extraction failed - file not created: {audio_path}")
+
+            # Delete the video file to save space
+            print(f"Deleting video file: {video_file}")
+            os.remove(video_file)
+
+            print(f"✓ Audio extracted successfully: {audio_path}")
+
+            # Try to get metadata after successful download
             try:
-                print(f"Download attempt {i+1}/{len(config_attempts)}...")
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    info = ydl.extract_info(url, download=True)
+                info_cmd = [
+                    yt_dlp_bin,
+                    '--dump-json',
+                    '--no-playlist',
+                    '--cookies-from-browser', 'firefox',
+                    url
+                ]
+                result = subprocess.run(info_cmd, capture_output=True, text=True, timeout=30)
+                if result.returncode == 0:
+                    info = json.loads(result.stdout)
+                else:
+                    info = {}
+            except:
+                info = {}
 
-                    audio_path = os.path.join(self.temp_dir, f"{info['id']}.wav")
+            return {
+                'audio_path': audio_path,
+                'title': info.get('title', f'YouTube Video {video_id}'),
+                'channel': info.get('uploader', 'Unknown'),
+                'duration': info.get('duration', 0),
+                'video_id': video_id,
+                'url': url,
+                'description': info.get('description', ''),
+                'chapters': info.get('chapters', []),
+            }
 
-                    return {
-                        'audio_path': audio_path,
-                        'title': info.get('title', 'Unknown'),
-                        'channel': info.get('uploader', 'Unknown'),
-                        'duration': info.get('duration', 0),
-                        'video_id': info.get('id', ''),
-                        'url': url,
-                        'description': info.get('description', ''),
-                        'chapters': info.get('chapters', []),
-                    }
-            except Exception as e:
-                last_error = str(e)
-                print(f"Attempt {i+1} failed: {e}")
-                continue
-
-        # All attempts failed
-        raise Exception(f"Failed to download YouTube video after {len(config_attempts)} attempts. Last error: {last_error}")
+        except subprocess.CalledProcessError as e:
+            error_msg = f"Command failed: {e.stderr if e.stderr else str(e)}"
+            print(f"✗ Failed: {error_msg}")
+            # Try to cleanup video file if it exists
+            if video_file and os.path.exists(video_file):
+                try:
+                    os.remove(video_file)
+                except:
+                    pass
+            raise Exception(error_msg)
+        except Exception as e:
+            # Try to cleanup video file if it exists
+            if video_file and os.path.exists(video_file):
+                try:
+                    os.remove(video_file)
+                except:
+                    pass
+            raise Exception(f"Failed to download YouTube audio: {e}")
 
     def extract_local_audio(self, video_path, video_id=None):
         """

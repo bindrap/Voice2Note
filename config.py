@@ -13,9 +13,12 @@ class Config:
     DATABASE_PATH = os.path.join(BASE_DIR, 'voice2note.db')
 
     # Whisper configuration
-    WHISPER_MODEL = os.getenv('WHISPER_MODEL', 'large-v3')
+    WHISPER_MODEL = os.getenv('WHISPER_MODEL', 'medium')  # Changed from large-v3 for 2-3x faster transcription
     WHISPER_PATH = os.path.join(BASE_DIR, 'Whisper', 'build', 'bin', 'whisper-cli')
     WHISPER_MODEL_PATH = os.path.join(BASE_DIR, 'Whisper', 'models', f'ggml-{WHISPER_MODEL}.bin')
+
+    # yt-dlp configuration (use global installation)
+    YT_DLP_PATH = '/usr/local/bin/yt-dlp'
 
     # Ollama configuration
     OLLAMA_API_KEY = os.getenv('OLLAMA_API_KEY', '1728cbe73f944db7afa1a3c8f52d2f41.GzEVZ8ADdcDHwIxdbvKnqbXy')

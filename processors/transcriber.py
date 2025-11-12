@@ -68,7 +68,8 @@ class Transcriber:
                 '-l', language,
                 '-otxt',  # Output as text
                 '-of', base_name,  # Output file base name
-                '--threads', '4',  # Number of threads
+                '--threads', '4',  # Number of threads (matches CPU cores)
+                '--processors', '1',  # Single processor for sequential processing
                 '--print-progress',
             ]
 
