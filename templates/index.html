@@ -56,10 +56,21 @@
         <!-- Progress Section -->
         <div id="progressSection" class="progress-section" style="display: none;">
             <h3>Processing...</h3>
-            <div class="progress-bar">
-                <div id="progressBar" class="progress-fill"></div>
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div id="progressBar" class="progress-fill">
+                        <span id="progressPercent" class="progress-percent"></span>
+                    </div>
+                </div>
+                <div class="progress-info">
+                    <p id="statusText" class="status-text">Initializing...</p>
+                    <div class="time-info">
+                        <span id="elapsedTime" class="time-label">Elapsed: 0s</span>
+                        <span id="estimatedTime" class="time-label">Estimated: --</span>
+                    </div>
+                </div>
             </div>
-            <p id="statusText" class="status-text">Initializing...</p>
+            <button id="cancelBtn" class="btn btn-danger" style="margin-top: 1rem;">Cancel Processing</button>
         </div>
 
         <!-- Result Section -->
@@ -67,6 +78,7 @@
             <div class="success-message">
                 <h3>✓ Processing Complete!</h3>
                 <p id="resultTitle"></p>
+                <p id="totalTime" class="total-time"></p>
                 <div class="result-actions">
                     <a id="viewNotesBtn" href="#" class="btn btn-primary">View Notes</a>
                     <a id="downloadBtn" href="#" class="btn btn-secondary">Download Markdown</a>
@@ -195,6 +207,59 @@
     });
 
     let statusPollInterval = null;
+    let startTime = null;
+    let elapsedTimeInterval = null;
+    let currentVideoId = null;
+
+    // Format seconds to human-readable time
+    function formatTime(seconds) {
+        if (seconds < 60) return `${Math.round(seconds)}s`;
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.round(seconds % 60);
+        if (mins < 60) return `${mins}m ${secs}s`;
+        const hours = Math.floor(mins / 60);
+        const remainingMins = mins % 60;
+        return `${hours}h ${remainingMins}m ${secs}s`;
+    }
+
+    // Update elapsed time display
+    function updateElapsedTime() {
+        if (!startTime) return;
+        const elapsed = (Date.now() - startTime) / 1000;
+        document.getElementById('elapsedTime').textContent = `Elapsed: ${formatTime(elapsed)}`;
+    }
+
+    // Estimate remaining time based on progress
+    function updateEstimatedTime(progress) {
+        if (!startTime || progress <= 0) return;
+        const elapsed = (Date.now() - startTime) / 1000;
+        const rate = progress / elapsed;
+        const remaining = (100 - progress) / rate;
+        document.getElementById('estimatedTime').textContent = `Estimated: ${formatTime(remaining)}`;
+    }
+
+    // Cancel button handler
+    document.getElementById('cancelBtn').addEventListener('click', async () => {
+        if (!currentVideoId) return;
+
+        if (confirm('Are you sure you want to cancel processing?')) {
+            try {
+                const response = await fetch(`/cancel/${currentVideoId}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                if (data.success) {
+                    clearInterval(statusPollInterval);
+                    clearInterval(elapsedTimeInterval);
+                    showError('Processing cancelled by user');
+                } else {
+                    alert('Failed to cancel: ' + data.error);
+                }
+            } catch (error) {
+                alert('Failed to cancel: ' + error.message);
+            }
+        }
+    });
 
     // Form submission
     form.addEventListener('submit', async (e) => {
@@ -236,6 +301,12 @@
 
             if (data.success && data.processing) {
                 // Processing started in background - poll for status
+                currentVideoId = data.video_id;
+                startTime = Date.now();
+
+                // Start elapsed time counter
+                elapsedTimeInterval = setInterval(updateElapsedTime, 1000);
+
                 document.getElementById('statusText').innerHTML =
                     data.message + '<br><small>You can navigate away - processing continues in background</small>';
                 startStatusPolling(data.video_id);
@@ -318,24 +389,50 @@
         const progress = status.progress || 0;
         const statusText = getStatusMessage(status.status, progress);
 
+        // Update progress bar with animation
         document.getElementById('progressBar').style.width = progress + '%';
-        document.getElementById('statusText').innerHTML =
-            `${statusText}<br><small>${progress}% complete</small>`;
+        document.getElementById('progressPercent').textContent = `${Math.round(progress)}%`;
+        document.getElementById('statusText').textContent = statusText;
+
+        // Update estimated time
+        if (progress > 5 && progress < 100) {
+            updateEstimatedTime(progress);
+        }
     }
 
     function showSuccess(videoId, title) {
+        // Calculate total time taken
+        let totalTimeText = '';
+        if (startTime) {
+            const totalSeconds = (Date.now() - startTime) / 1000;
+            totalTimeText = `⏱️ Total time taken: ${formatTime(totalSeconds)}`;
+        }
+
+        // Clear intervals
+        if (statusPollInterval) clearInterval(statusPollInterval);
+        if (elapsedTimeInterval) clearInterval(elapsedTimeInterval);
+
         progressSection.style.display = 'none';
         resultSection.style.display = 'block';
         document.getElementById('resultTitle').textContent = title;
+        document.getElementById('totalTime').textContent = totalTimeText;
         document.getElementById('viewNotesBtn').href = `/notes/${videoId}`;
         document.getElementById('downloadBtn').href = `/download/${videoId}`;
 
         // Re-enable submit button
         submitBtn.disabled = false;
         submitBtn.textContent = 'Process Video';
+
+        // Reset timing
+        startTime = null;
+        currentVideoId = null;
     }
 
     function showError(errorMessage) {
+        // Clear intervals
+        if (statusPollInterval) clearInterval(statusPollInterval);
+        if (elapsedTimeInterval) clearInterval(elapsedTimeInterval);
+
         progressSection.style.display = 'none';
         errorSection.style.display = 'block';
         document.getElementById('errorText').textContent = errorMessage;
@@ -343,6 +440,10 @@
         // Re-enable submit button
         submitBtn.disabled = false;
         submitBtn.textContent = 'Process Video';
+
+        // Reset timing
+        startTime = null;
+        currentVideoId = null;
     }
 </script>
 {% endblock %}

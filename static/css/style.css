@@ -259,13 +259,19 @@ body {
     padding: 2rem;
 }
 
+.progress-container {
+    margin: 1.5rem 0;
+}
+
 .progress-bar {
     width: 100%;
-    height: 8px;
+    height: 32px;
     background: var(--border-color);
-    border-radius: 6px;
+    border-radius: 12px;
     overflow: hidden;
     margin: 1.5rem 0;
+    position: relative;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.06);
 }
 
 .progress-fill {
@@ -273,12 +279,76 @@ body {
     background: linear-gradient(90deg, var(--primary-color), #6366f1);
     transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     width: 0%;
-    box-shadow: 0 0 10px rgba(79, 70, 229, 0.3);
+    box-shadow: 0 0 20px rgba(79, 70, 229, 0.4);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 12px;
+    animation: shimmer 2s infinite;
+    background-size: 200% 100%;
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+.progress-percent {
+    color: white;
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.progress-info {
+    margin-top: 1rem;
 }
 
 .status-text {
+    color: var(--text-color);
+    font-size: 1rem;
+    font-weight: 500;
+    margin-bottom: 0.75rem;
+}
+
+.time-info {
+    display: flex;
+    justify-content: space-around;
+    gap: 2rem;
+    margin-top: 1rem;
+    padding: 1rem;
+    background: var(--card-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.time-label {
     color: var(--text-muted);
     font-size: 0.875rem;
+    font-weight: 500;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.time-label::before {
+    content: '⏱️';
+    font-size: 1.25rem;
+}
+
+.btn-danger {
+    background: var(--error-color);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #dc2626;
 }
 
 /* Video progress (for history cards) */
@@ -336,6 +406,13 @@ body {
 .success-message h3 {
     color: var(--success-color);
     margin-bottom: 1rem;
+}
+
+.total-time {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    font-weight: 500;
+    margin: 0.5rem 0 1rem 0;
 }
 
 .error-message {

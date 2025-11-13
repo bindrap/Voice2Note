@@ -14,10 +14,20 @@
                 {% if video.duration %}
                 <span class="badge">⏱️ {{ (video.duration // 60) }} minutes</span>
                 {% endif %}
+                {% if video.source_url %}
+                <span class="badge">
+                    <a href="{{ video.source_url }}" target="_blank" style="color: inherit; text-decoration: none;">
+                        🔗 Source URL
+                    </a>
+                </span>
+                {% endif %}
                 <span class="badge">📅 {{ video.processed_date }}</span>
             </div>
         </div>
         <div class="notes-actions">
+            <a href="/transcript/{{ video.id }}" class="btn btn-secondary">
+                📄 View Transcript
+            </a>
             <a href="/download/{{ video.id }}" class="btn btn-primary">
                 📥 Download Markdown
             </a>
