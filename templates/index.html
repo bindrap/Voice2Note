@@ -78,6 +78,7 @@
             <div class="success-message">
                 <h3>✓ Processing Complete!</h3>
                 <p id="resultTitle"></p>
+                <p id="totalTime" class="total-time"></p>
                 <div class="result-actions">
                     <a id="viewNotesBtn" href="#" class="btn btn-primary">View Notes</a>
                     <a id="downloadBtn" href="#" class="btn btn-secondary">Download Markdown</a>
@@ -400,6 +401,13 @@
     }
 
     function showSuccess(videoId, title) {
+        // Calculate total time taken
+        let totalTimeText = '';
+        if (startTime) {
+            const totalSeconds = (Date.now() - startTime) / 1000;
+            totalTimeText = `⏱️ Total time taken: ${formatTime(totalSeconds)}`;
+        }
+
         // Clear intervals
         if (statusPollInterval) clearInterval(statusPollInterval);
         if (elapsedTimeInterval) clearInterval(elapsedTimeInterval);
@@ -407,6 +415,7 @@
         progressSection.style.display = 'none';
         resultSection.style.display = 'block';
         document.getElementById('resultTitle').textContent = title;
+        document.getElementById('totalTime').textContent = totalTimeText;
         document.getElementById('viewNotesBtn').href = `/notes/${videoId}`;
         document.getElementById('downloadBtn').href = `/download/${videoId}`;
 
