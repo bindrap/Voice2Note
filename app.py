@@ -396,6 +396,29 @@ def view_notes(video_id):
     return render_template('notes.html', video=video, notes=notes)
 
 
+@app.route('/transcript/<int:video_id>')
+@login_required
+def view_transcript(video_id):
+    """View raw transcript"""
+    video = db.get_video(video_id)
+
+    # Verify ownership
+    if not video or video['user_id'] != session['user_id']:
+        return "Video not found", 404
+
+    # Get transcript from database
+    conn = db.get_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM transcripts WHERE video_id = ?', (video_id,))
+    transcript = cursor.fetchone()
+    conn.close()
+
+    if not transcript:
+        return "Transcript not found", 404
+
+    return render_template('transcript.html', video=video, transcript=transcript)
+
+
 @app.route('/download/<int:video_id>')
 @login_required
 def download_notes(video_id):
@@ -419,6 +442,41 @@ def download_notes(video_id):
         as_attachment=True,
         download_name=filename,
         mimetype='text/markdown'
+    )
+
+
+@app.route('/download-transcript/<int:video_id>')
+@login_required
+def download_transcript(video_id):
+    """Download raw transcript as text file"""
+    video = db.get_video(video_id)
+
+    # Verify ownership
+    if not video or video['user_id'] != session['user_id']:
+        return "Video not found", 404
+
+    # Get transcript from database
+    conn = db.get_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM transcripts WHERE video_id = ?', (video_id,))
+    transcript = cursor.fetchone()
+    conn.close()
+
+    if not transcript:
+        return "Transcript not found", 404
+
+    # Save to temp file
+    filename = f"{video['title']}_transcript.txt".replace('/', '-')
+    temp_file = os.path.join(Config.TEMP_DIR, filename)
+
+    with open(temp_file, 'w', encoding='utf-8') as f:
+        f.write(transcript['content'])
+
+    return send_file(
+        temp_file,
+        as_attachment=True,
+        download_name=filename,
+        mimetype='text/plain'
     )
 
 

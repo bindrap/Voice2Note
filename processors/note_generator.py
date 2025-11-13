@@ -57,23 +57,38 @@ class NoteGenerator:
         """Build the prompt for note generation"""
 
         # Base prompt
-        prompt = """You are an expert note-taker creating comprehensive, well-structured notes from video transcripts.
+        prompt = """You are an expert note-taker creating comprehensive, detailed, and well-structured notes from video transcripts.
 
-Your task is to convert the following transcript into exceptional markdown notes that are:
+Your task is to convert the following transcript into exceptional markdown notes that capture ALL the information presented.
+
+IMPORTANT GUIDELINES:
+- DO NOT summarize or skip content - capture ALL details, explanations, and information
+- DO NOT remove examples, stories, or contextual information
+- DO NOT condense multiple concepts into single points
+- Include ALL technical details, specifications, and explanations
+- Preserve the flow and progression of ideas from the original content
+- If the speaker explains something in depth, your notes should reflect that depth
+- When in doubt, include MORE detail rather than less
+
+Your notes should be:
 - Well-organized with clear headings and subheadings
-- Easy to scan and understand
-- Comprehensive yet concise
+- Comprehensive and detailed (not abbreviated or summarized)
+- Easy to scan and navigate
 - Properly formatted in markdown
 
 Please include:
-1. A brief overview/summary at the top
+1. A brief overview at the top (2-3 sentences)
 2. Main concepts organized by topic (use ## for main sections, ### for subsections)
-3. Key points in bullet lists
-4. Important terms, names, or concepts in **bold**
-5. Step-by-step instructions or processes (if applicable) as numbered lists
-6. Code examples in code blocks (if applicable)
-7. A "Key Takeaways" section at the end with 3-5 main points
-8. Any important quotes in blockquotes (if notable)
+3. Detailed bullet points that capture ALL information (not just highlights)
+4. Important terms, names, definitions, or concepts in **bold**
+5. Complete step-by-step instructions or processes (if applicable) as numbered lists
+6. All examples, use cases, and practical applications mentioned
+7. Code examples in code blocks with full context (if applicable)
+8. Important quotes in blockquotes
+9. A "Key Takeaways" section at the end with 5-10 comprehensive points
+10. A "Additional Details" section if there's extra context worth preserving
+
+Remember: Your goal is to create notes so comprehensive that someone could understand the full content WITHOUT watching the video. Don't leave out important information!
 
 """
 
