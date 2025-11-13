@@ -1,0 +1,59 @@
+[2025-11-13 16:39:40 +0000] [2093965] [INFO] Starting gunicorn 23.0.0
+[2025-11-13 16:39:40 +0000] [2093965] [INFO] Listening at: http://0.0.0.0:5000 (2093965)
+[2025-11-13 16:39:40 +0000] [2093965] [INFO] Using worker: sync
+[2025-11-13 16:39:40 +0000] [2093967] [INFO] Booting worker with pid: 2093967
+[2025-11-13 16:39:40 +0000] [2093968] [INFO] Booting worker with pid: 2093968
+[2025-11-13 16:39:40 +0000] [2093969] [INFO] Booting worker with pid: 2093969
+[2025-11-13 16:39:40 +0000] [2093970] [INFO] Booting worker with pid: 2093970
+[2025-11-13 16:39:40 +0000] [2093971] [INFO] Booting worker with pid: 2093971
+[2025-11-13 16:39:40 +0000] [2093972] [INFO] Booting worker with pid: 2093972
+[2025-11-13 16:39:41 +0000] [2093973] [INFO] Booting worker with pid: 2093973
+[2025-11-13 16:39:41 +0000] [2093974] [INFO] Booting worker with pid: 2093974
+[2025-11-13 16:47:32 +0000] [2095216] [INFO] Starting gunicorn 23.0.0
+[2025-11-13 16:47:32 +0000] [2095216] [ERROR] Connection in use: ('0.0.0.0', 5000)
+[2025-11-13 16:47:32 +0000] [2095216] [ERROR] connection to ('0.0.0.0', 5000) failed: [Errno 98] Address already in use
+[2025-11-13 16:47:33 +0000] [2095216] [ERROR] Connection in use: ('0.0.0.0', 5000)
+[2025-11-13 16:47:33 +0000] [2095216] [ERROR] connection to ('0.0.0.0', 5000) failed: [Errno 98] Address already in use
+[2025-11-13 16:47:34 +0000] [2095216] [ERROR] Connection in use: ('0.0.0.0', 5000)
+[2025-11-13 16:47:34 +0000] [2095216] [ERROR] connection to ('0.0.0.0', 5000) failed: [Errno 98] Address already in use
+[2025-11-13 16:47:35 +0000] [2095216] [ERROR] Connection in use: ('0.0.0.0', 5000)
+[2025-11-13 16:47:35 +0000] [2095216] [ERROR] connection to ('0.0.0.0', 5000) failed: [Errno 98] Address already in use
+[2025-11-13 16:47:36 +0000] [2095216] [ERROR] Connection in use: ('0.0.0.0', 5000)
+[2025-11-13 16:47:36 +0000] [2095216] [ERROR] connection to ('0.0.0.0', 5000) failed: [Errno 98] Address already in use
+[2025-11-13 16:47:37 +0000] [2095216] [ERROR] Can't connect to ('0.0.0.0', 5000)
+[2025-11-13 16:50:03 +0000] [2095895] [INFO] Starting gunicorn 23.0.0
+[2025-11-13 16:50:03 +0000] [2095895] [ERROR] Connection in use: ('0.0.0.0', 5000)
+[2025-11-13 16:50:03 +0000] [2095895] [ERROR] connection to ('0.0.0.0', 5000) failed: [Errno 98] Address already in use
+[2025-11-13 16:50:04 +0000] [2095895] [ERROR] Connection in use: ('0.0.0.0', 5000)
+[2025-11-13 16:50:04 +0000] [2095895] [ERROR] connection to ('0.0.0.0', 5000) failed: [Errno 98] Address already in use
+[2025-11-13 16:50:05 +0000] [2095895] [ERROR] Connection in use: ('0.0.0.0', 5000)
+[2025-11-13 16:50:05 +0000] [2095895] [ERROR] connection to ('0.0.0.0', 5000) failed: [Errno 98] Address already in use
+[2025-11-13 16:50:06 +0000] [2095895] [ERROR] Connection in use: ('0.0.0.0', 5000)
+[2025-11-13 16:50:06 +0000] [2095895] [ERROR] connection to ('0.0.0.0', 5000) failed: [Errno 98] Address already in use
+[2025-11-13 16:50:07 +0000] [2095895] [ERROR] Connection in use: ('0.0.0.0', 5000)
+[2025-11-13 16:50:07 +0000] [2095895] [ERROR] connection to ('0.0.0.0', 5000) failed: [Errno 98] Address already in use
+[2025-11-13 16:50:08 +0000] [2095895] [ERROR] Can't connect to ('0.0.0.0', 5000)
+[2025-11-13 16:55:53 +0000] [2093968] [INFO] Worker exiting (pid: 2093968)
+[2025-11-13 16:55:53 +0000] [2093972] [INFO] Worker exiting (pid: 2093972)
+[2025-11-13 16:55:53 +0000] [2093974] [INFO] Worker exiting (pid: 2093974)
+[2025-11-13 16:55:53 +0000] [2093965] [INFO] Handling signal: term
+[2025-11-13 16:55:53 +0000] [2093967] [INFO] Worker exiting (pid: 2093967)
+[2025-11-13 16:55:53 +0000] [2093969] [INFO] Worker exiting (pid: 2093969)
+[2025-11-13 16:55:53 +0000] [2093970] [INFO] Worker exiting (pid: 2093970)
+[2025-11-13 16:55:53 +0000] [2093965] [ERROR] Worker (pid:2093968) was sent SIGTERM!
+[2025-11-13 16:55:53 +0000] [2093965] [ERROR] Worker (pid:2093972) was sent SIGTERM!
+[2025-11-13 16:55:53 +0000] [2093965] [ERROR] Worker (pid:2093974) was sent SIGTERM!
+[2025-11-13 16:55:53 +0000] [2093971] [INFO] Worker exiting (pid: 2093971)
+[2025-11-13 16:55:53 +0000] [2093973] [INFO] Worker exiting (pid: 2093973)
+[2025-11-13 16:55:53 +0000] [2093965] [INFO] Shutting down: Master
+[2025-11-13 16:55:56 +0000] [2097024] [INFO] Starting gunicorn 23.0.0
+[2025-11-13 16:55:56 +0000] [2097024] [INFO] Listening at: http://0.0.0.0:5000 (2097024)
+[2025-11-13 16:55:56 +0000] [2097024] [INFO] Using worker: sync
+[2025-11-13 16:55:56 +0000] [2097026] [INFO] Booting worker with pid: 2097026
+[2025-11-13 16:55:56 +0000] [2097027] [INFO] Booting worker with pid: 2097027
+[2025-11-13 16:55:56 +0000] [2097028] [INFO] Booting worker with pid: 2097028
+[2025-11-13 16:55:56 +0000] [2097029] [INFO] Booting worker with pid: 2097029
+[2025-11-13 16:55:56 +0000] [2097030] [INFO] Booting worker with pid: 2097030
+[2025-11-13 16:55:56 +0000] [2097031] [INFO] Booting worker with pid: 2097031
+[2025-11-13 16:55:56 +0000] [2097032] [INFO] Booting worker with pid: 2097032
+[2025-11-13 16:55:56 +0000] [2097033] [INFO] Booting worker with pid: 2097033
