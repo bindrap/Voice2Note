@@ -39,6 +39,18 @@
                     >
                 </div>
 
+                <div class="remember-me-group">
+                    <label class="checkbox-label">
+                        <input
+                            type="checkbox"
+                            id="remember_me"
+                            name="remember_me"
+                            value="yes"
+                        >
+                        <span>Remember me for 30 days</span>
+                    </label>
+                </div>
+
                 <button type="submit" class="btn btn-primary btn-block">
                     Sign In
                 </button>
@@ -82,7 +94,30 @@
 }
 
 .auth-form .input-group:last-of-type {
+    margin-bottom: 1rem;
+}
+
+.remember-me-group {
     margin-bottom: 1.5rem;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text-color);
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin-right: 0.5rem;
+    cursor: pointer;
+}
+
+.checkbox-label span {
+    user-select: none;
 }
 
 .btn-block {

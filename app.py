@@ -1,9 +1,11 @@
-from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, session, flash
+from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, session, flash, make_response
 import os
 import traceback
 from werkzeug.utils import secure_filename
 from functools import wraps
 import threading
+import secrets
+from datetime import datetime, timedelta
 from config import Config
 from database.db_manager import DatabaseManager
 from processors.video_handler import VideoHandler
@@ -49,6 +51,34 @@ def inject_user():
         user = db.get_user_by_id(session['user_id'])
         return {'current_user': user}
     return {'current_user': None}
+
+
+# Check for remember me token before each request
+@app.before_request
+def check_remember_me():
+    """Check for remember me token and auto-login if valid"""
+    # Skip if user is already logged in
+    if 'user_id' in session:
+        return
+
+    # Skip for static files and certain routes
+    if request.endpoint and (request.endpoint == 'static' or request.endpoint in ['login', 'register']):
+        return
+
+    # Check for remember_token cookie
+    remember_token = request.cookies.get('remember_token')
+    if remember_token:
+        # Validate token from database
+        token_data = db.get_remember_token(remember_token)
+
+        if token_data:
+            # Token is valid and not expired, log user in
+            session['user_id'] = token_data['user_id']
+            db.update_last_login(token_data['user_id'])
+        else:
+            # Token is invalid or expired, we'll let it expire naturally
+            # (the cookie will be cleared on logout or when user logs in again)
+            pass
 
 
 # ===== Authentication Routes =====
@@ -105,6 +135,7 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
+        remember_me = request.form.get('remember_me') == 'yes'
 
         if not username or not password:
             return render_template('login.html', error='Username and password are required')
@@ -113,7 +144,32 @@ def login():
         if user:
             session['user_id'] = user['id']
             db.update_last_login(user['id'])
-            return redirect(url_for('index'))
+
+            # Create response object
+            response = make_response(redirect(url_for('index')))
+
+            # Handle remember me functionality
+            if remember_me:
+                # Generate secure random token
+                token = secrets.token_urlsafe(32)
+
+                # Set expiration to 30 days from now
+                expires_at = datetime.now() + timedelta(days=30)
+
+                # Store token in database
+                db.create_remember_token(user['id'], token, expires_at)
+
+                # Set cookie that expires in 30 days
+                response.set_cookie(
+                    'remember_token',
+                    token,
+                    max_age=30*24*60*60,  # 30 days in seconds
+                    httponly=True,         # Prevent JavaScript access
+                    secure=False,          # Set to True in production with HTTPS
+                    samesite='Lax'         # CSRF protection
+                )
+
+            return response
         else:
             return render_template('login.html', error='Invalid username or password')
 
@@ -123,8 +179,18 @@ def login():
 @app.route('/logout')
 def logout():
     """User logout"""
+    # Delete all remember tokens for this user from database
+    if 'user_id' in session:
+        db.delete_user_remember_tokens(session['user_id'])
+
+    # Clear session
     session.clear()
-    return redirect(url_for('login'))
+
+    # Create response and delete the remember_token cookie
+    response = make_response(redirect(url_for('login')))
+    response.set_cookie('remember_token', '', expires=0)
+
+    return response
 
 
 @app.route('/profile')

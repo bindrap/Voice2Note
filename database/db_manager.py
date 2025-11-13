@@ -351,3 +351,71 @@ class DatabaseManager:
         conn.close()
 
         return [dict(video) for video in videos]
+
+    # ===== Remember Me Token Methods =====
+
+    def create_remember_token(self, user_id, token, expires_at):
+        """Create a remember me token"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute('''
+                INSERT INTO remember_tokens (user_id, token, expires_at)
+                VALUES (?, ?, ?)
+            ''', (user_id, token, expires_at))
+
+            token_id = cursor.lastrowid
+            conn.commit()
+            conn.close()
+            return token_id
+        except sqlite3.IntegrityError:
+            conn.close()
+            return None
+
+    def get_remember_token(self, token):
+        """Get remember token and associated user if valid"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            SELECT rt.*, u.*
+            FROM remember_tokens rt
+            JOIN users u ON rt.user_id = u.id
+            WHERE rt.token = ? AND rt.expires_at > ?
+        ''', (token, datetime.now()))
+
+        result = cursor.fetchone()
+        conn.close()
+
+        return dict(result) if result else None
+
+    def delete_remember_token(self, token):
+        """Delete a specific remember token"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute('DELETE FROM remember_tokens WHERE token = ?', (token,))
+
+        conn.commit()
+        conn.close()
+
+    def delete_user_remember_tokens(self, user_id):
+        """Delete all remember tokens for a user (used on logout)"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute('DELETE FROM remember_tokens WHERE user_id = ?', (user_id,))
+
+        conn.commit()
+        conn.close()
+
+    def cleanup_expired_tokens(self):
+        """Delete all expired remember tokens"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute('DELETE FROM remember_tokens WHERE expires_at < ?', (datetime.now(),))
+
+        conn.commit()
+        conn.close()

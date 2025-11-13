@@ -10,6 +10,16 @@ CREATE TABLE IF NOT EXISTS users (
     last_login TIMESTAMP
 );
 
+-- Remember me tokens table: stores persistent login tokens
+CREATE TABLE IF NOT EXISTS remember_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    token TEXT UNIQUE NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- Videos table: stores metadata about processed videos
 CREATE TABLE IF NOT EXISTS videos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -58,6 +68,8 @@ CREATE TABLE IF NOT EXISTS processing_status (
 -- Indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_remember_tokens_token ON remember_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_remember_tokens_user ON remember_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_videos_user ON videos(user_id);
 CREATE INDEX IF NOT EXISTS idx_videos_title ON videos(title);
 CREATE INDEX IF NOT EXISTS idx_videos_processed_date ON videos(processed_date DESC);
